@@ -1,0 +1,20 @@
+[
+  {
+    "caseId": "demo-case-001",
+    "dataKind": "demo",
+    "message": "这个产品有什么官方说明？",
+    "cardContext": { "confirmedFacts": {}, "preferences": [], "concerns": [] },
+    "expected": {
+      "intent": "replace-with-confirmed-intent",
+      "emotion": "replace-with-confirmed-emotion",
+      "primarySkill": "replace-with-confirmed-skill-id",
+      "riskLevel": "low",
+      "needsHumanHandoff": false,
+      "action": "answer",
+      "mustInclude": ["明确标注这是虚构演示资料"],
+      "mustNotInclude": ["编造真实产品功效"],
+      "sourceIds": ["demo-manual"]
+    },
+    "notes": "仅是格式示例，意图和Skill标签待业务确认；不计入50条金标。"
+  }
+]

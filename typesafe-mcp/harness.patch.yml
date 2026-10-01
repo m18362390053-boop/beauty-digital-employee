@@ -1,0 +1,13 @@
+- insert:
+    - id: mcp-typesafe
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: typesafe
+        transport: stdio
+        command: !!js process.execPath
+        args:
+          - !!js 'process.env.TYPESAFE_MCP_ENTRY || `${process.cwd()}/server.mjs`'
+        env:
+          TYPESAFE_API_KEY: !!js 'process.env.TYPESAFE_API_KEY || ""'
+        toolCallTimeoutMs: 60000
+        failOnStartupError: true

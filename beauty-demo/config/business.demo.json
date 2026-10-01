@@ -1,0 +1,59 @@
+{
+  "version": "demo-policy-v2",
+  "reviewStatus": "demo",
+  "notice": "用于开发验证的暂定分类、阈值和提示词，需业务B确认后替换，不属于正式金标或品牌话术。",
+  "intents": {
+    "product_advice": "产品基础介绍、已审核说明、成分、用法、搭配或日常护理咨询；包括演示产品的资料查询",
+    "after_sales": "退换货、物流、破损或投诉",
+    "emotional_support": "表达情绪，主要需要理解和温和回应",
+    "safety": "报告使用后不适，或询问不良反应与风险"
+  },
+  "emotions": { "neutral": "中性", "positive": "正向", "frustrated": "不满", "anxious": "担忧或焦虑" },
+  "riskLevels": {
+    "low": "普通商品或日常护理咨询，没有明确不适或争议信息",
+    "medium": "信息不完整，报告轻度不适或需澄清使用背景，应保守追问",
+    "high": "报告明显肿胀、呼吸不适等严重情况，或必须由人工处理的风险"
+  },
+  "thresholds": { "intent": 0.65, "skill": 0.65, "risk": 0.65, "human": 0.75, "information": 0.6 },
+  "skills": [
+    {
+      "id": "product_consult", "version": "demo-v1", "description": "单产品知识与日常使用咨询",
+      "knowledgeScopes": ["product", "comment_insights"], "requiredFields": [],
+      "intents": ["product_advice", "safety"],
+      "instructions": "演示配置：仅依据给定的审核资料答复。评论只能作为主观体验，不能当成功效证据。缺资料先问清，不诊断或承诺效果。"
+    },
+    {
+      "id": "after_sales", "version": "demo-v1", "description": "售后规则解释与诉求收集",
+      "knowledgeScopes": ["after_sales"], "requiredFields": [],
+      "intents": ["after_sales"],
+      "instructions": "演示配置：引用给定售后规则，收集缺少的诉求信息。不承诺退款，不执行订单写操作。"
+    },
+    {
+      "id": "emotional_support", "version": "demo-v1", "description": "用户情绪和反馈承接",
+      "knowledgeScopes": ["product"], "requiredFields": [],
+      "intents": ["emotional_support"],
+      "instructions": "演示配置：简短理解用户情绪，不假装真人，不做医疗或心理诊断，不添加没有依据的产品效果。"
+    }
+  ],
+  "rules": [
+    {
+      "id": "explicit-urgent", "riskLevel": "high",
+      "phrases": ["呼吸困难", "喉咙肿胀", "面部肿胀", "脸肿了"],
+      "ignorePhrases": ["没有呼吸困难", "无呼吸困难", "没有喉咙肿胀", "没有面部肿胀", "不是脸肿了"],
+      "message": "请先停止使用相关产品。若出现呼吸困难或快速加重的肿胀，请立即联系当地急救或就医，不要等待客服。已进入待人工队列。"
+    },
+    {
+      "id": "explicit-human", "riskLevel": null,
+      "phrases": ["转人工", "找人工", "人工客服", "我要投诉"],
+      "ignorePhrases": ["不要转人工", "不用转人工", "不需要人工客服"],
+      "message": "已记录您的人工服务请求，当前为等待人工接入，AI常规回答已暂停。"
+    }
+  ],
+  "templates": {
+    "clarify": "为了避免给出不适合的建议，请补充具体问题、使用时间及目前的感受；也可以直接选择转人工。",
+    "unavailable": "当前智能服务暂不可用，您的消息已保存。您可以补充问题，或选择人工服务。",
+    "noKnowledge": "现有审核资料不足以回答这个问题。请补充您想确认的具体信息，或交由人工核实。",
+    "risk": "这类情况需要谨慎处理，暂不继续推荐产品。已进入待人工队列，尚未有人工接入。",
+    "waiting": "您的消息已保存到人工会话，AI回答保持暂停，等待客服处理。"
+  }
+}

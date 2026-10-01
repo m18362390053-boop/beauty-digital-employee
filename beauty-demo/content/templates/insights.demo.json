@@ -1,0 +1,15 @@
+{
+  "insightId": "demo-insight-001",
+  "productId": "demo-product",
+  "datasetVersion": "demo-batch-001",
+  "dataKind": "demo",
+  "period": { "from": "2026-03-30", "to": "2026-09-30" },
+  "sampleSize": 3,
+  "method": "虚构样例：按去重评论逐条人工标注，含1条发布日期未知的记录，趋势分析需单列未知日期。",
+  "tagCounts": [
+    { "tag": "紧绷", "count": 1, "evidenceCommentIds": ["demo-comment-001"] },
+    { "tag": "卡粉", "count": 1, "evidenceCommentIds": ["demo-comment-001"] },
+    { "tag": "售后", "count": 1, "evidenceCommentIds": ["demo-comment-002"] }
+  ],
+  "summary": "以上仅演示数据格式，不代表真实消费者调查结果。"
+}

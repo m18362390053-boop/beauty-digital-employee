@@ -1,0 +1,11 @@
+{
+  "apiKeyFiles": {
+    "TYPESAFE_API_KEY": "../../typesafe_apikey.txt",
+    "CHAT_API_KEY": "../../deepseek_api.txt"
+  },
+  "chat": {
+    "baseUrl": "https://api.deepseek.com/v1",
+    "model": "deepseek-flash",
+    "thinking": "disabled"
+  }
+}

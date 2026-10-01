@@ -1,0 +1,160 @@
+:root {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #35253f;
+  background: #f7f3fa;
+  line-height: 1.6;
+  font-size: 15px;
+  --primary: #62348a;
+  --primary-dark: #45215f;
+  --border: #e4d9ed;
+  --muted: #74647e;
+  --gold: #937143;
+  --surface: #fffdff;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse at 92% 0, #e9dcf3 0, transparent 42%),
+    linear-gradient(160deg, #fcf9fd 0%, #f4eef8 55%, #f9f5fb 100%);
+  min-height: 100vh;
+}
+header, main, nav, .notice, #notification, footer { max-width: 1250px; margin: auto; }
+header {
+  padding: 38px 28px 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+}
+h1 { font-size: 30px; margin: 6px 0; font-weight: 600; color: var(--primary-dark); letter-spacing: .5px; }
+h2 { font-size: 19px; margin: 0 0 14px; color: var(--primary-dark); }
+p { margin: 6px 0 14px; }
+.eyebrow { font-size: 11px; letter-spacing: 3px; color: var(--gold); display: flex; align-items: center; gap: 10px; }
+.eyebrow::before { content: ""; width: 26px; height: 1px; background: #b69a70; }
+.health { text-align: right; white-space: pre-line; color: var(--primary); }
+.health small { display: block; color: var(--muted); margin-top: 8px; }
+.notice {
+  padding: 12px 24px;
+  border: 1px solid #d9c6e8;
+  background: #eee5f5;
+  border-radius: 10px;
+  color: #604473;
+  font-size: 13px;
+}
+nav { display: flex; gap: 8px; padding: 24px 24px 12px; border-bottom: 1px solid var(--border); }
+button {
+  font: inherit;
+  padding: 9px 15px;
+  background: var(--surface);
+  border: 1px solid #ded0e9;
+  border-radius: 8px;
+  color: #57376d;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+button:hover { background: #eee4f6; border-color: #bda2d2; }
+button.selected, button.primary {
+  background: linear-gradient(135deg, #754699, #512674);
+  color: #fff;
+  border-color: #633788;
+  box-shadow: 0 3px 9px #5126741a;
+}
+button.selected:hover, button.primary:hover { background: linear-gradient(135deg, #653688, #45215f); }
+button:disabled { opacity: .5; cursor: wait; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 3px solid #b68ace;
+  outline-offset: 2px;
+}
+main { padding: 22px 24px; min-height: 65vh; }
+.toolbar { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; margin-bottom: 18px; }
+.grow { flex: 1; min-width: 0; }
+.badge { border: 1px solid #d7c3e6; background: #eee2f6; color: #623e7c; padding: 8px 12px; border-radius: 20px; font-size: 12px; }
+.columns { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(270px, 1fr); gap: 20px; }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 18px;
+  box-shadow: 0 6px 24px #4c226408;
+  min-width: 0;
+}
+.narrow { max-width: 760px; margin: auto; }
+label { display: block; font-size: 13px; margin-bottom: 8px; }
+input, textarea, select {
+  display: block;
+  width: 100%;
+  font: inherit;
+  border: 1px solid var(--border);
+  background: #fcf9fe;
+  color: inherit;
+  padding: 10px;
+  border-radius: 8px;
+  margin: 6px 0 12px;
+}
+select { min-width: 170px; max-width: 100%; margin-bottom: 0; }
+textarea { resize: vertical; }
+textarea::placeholder { color: #8c7a96; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+pre {
+  font: 12px/1.6 Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 380px;
+  overflow: auto;
+  background: #f5eff9;
+  color: #594466;
+  padding: 12px;
+  border-radius: 8px;
+}
+.conversation { display: flex; flex-direction: column; }
+#messages { min-height: 280px; max-height: 510px; overflow: auto; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
+.message { padding: 13px 16px; border-radius: 12px; background: #f4eef9; max-width: 94%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message.user { align-self: flex-end; background: linear-gradient(135deg, #eee0f8, #e5d5f0); color: #442756; }
+.message.human { border-left: 4px solid #9671b2; background: #f5effa; }
+.message.system { background: #f5ebdd; color: #66503a; }
+.message .meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.message .actions button { font-size: 12px; padding: 4px 8px; }
+#notification { padding: 0 24px; min-height: 24px; color: #805126; font-size: 13px; }
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+.metric { background: linear-gradient(145deg, #fff, #f9f3fd); border: 1px solid var(--border); border-top: 3px solid #c7adda; border-radius: 12px; padding: 18px; }
+.metric strong { display: block; font-size: 29px; margin: 4px 0; color: var(--primary); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+th { color: #5d3b76; background: #faf6fd; }
+summary { cursor: pointer; color: #5d3b76; }
+footer { padding: 18px 24px 35px; color: var(--muted); font-size: 12px; }
+details p { white-space: pre-wrap; }
+.ticket-actions { margin-bottom: 12px; }
+.page[hidden] { display: none; }
+
+@media (max-width: 800px) {
+  header { align-items: start; padding: 24px 18px; }
+  h1 { font-size: 23px; }
+  .health { font-size: 12px; }
+  .notice { margin: 0 15px; }
+  .columns { grid-template-columns: 1fr; }
+  nav { overflow: auto; padding: 18px 15px 10px; }
+  nav button { white-space: nowrap; }
+  main { padding: 18px 15px; }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .toolbar select { min-width: 100px; max-width: 70vw; }
+  .toolbar > label { max-width: 100%; }
+  .panel { padding: 16px; }
+}
+@media (max-width: 540px) {
+  header { flex-direction: column; gap: 12px; }
+  nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  nav button { width: 100%; }
+  .health { text-align: left; }
+  .health small { margin-top: 3px; }
+  th, td { padding: 7px; }
+  table { table-layout: fixed; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+}

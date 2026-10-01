@@ -1,0 +1,35 @@
+{
+  "name": "beauty-customer-service-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch server/index.ts",
+    "start": "node dist/server/index.js",
+    "test": "npm run build && node --test dist/tests/foundation.test.js dist/tests/mcp.test.js dist/tests/workflow.test.js dist/tests/local-runtime.test.js",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "smoke": "npm run build && tsx scripts/smoke.ts",
+    "mcp": "node dist/server/mcp/index.js",
+    "smoke:mcp": "npm run build && tsx scripts/smoke-mcp.ts",
+    "test:ui": "npm run build && node --test dist/tests/ui.browser.js",
+    "eval:route": "tsx scripts/evaluate-routing.ts",
+    "backup": "tsx scripts/backup-db.ts",
+    "check:config": "tsx scripts/check-local.ts",
+    "check:live": "tsx scripts/live-check.ts",
+    "verify:live-mcp": "npm run build && tsx scripts/verify-live-mcp.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "express": "5.1.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "playwright-core": "1.63.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3"
+  }
+}

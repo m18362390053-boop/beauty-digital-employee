@@ -1,0 +1,15 @@
+- insert:
+    - id: mcp-beauty
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: beauty
+        transport: stdio
+        command: !!js process.execPath
+        args:
+          - !!js 'process.env.BEAUTY_MCP_ENTRY || `${process.cwd()}/dist/server/mcp/index.js`'
+        env:
+          BEAUTY_API_URL: !!js 'process.env.BEAUTY_API_URL || "http://127.0.0.1:3090"'
+          BEAUTY_USER_ID: !!js 'process.env.BEAUTY_USER_ID || "demo-user-a"'
+          BEAUTY_API_TIMEOUT_MS: '10000'
+        toolCallTimeoutMs: 75000
+        failOnStartupError: true

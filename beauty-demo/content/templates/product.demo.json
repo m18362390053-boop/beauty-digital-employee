@@ -1,0 +1,30 @@
+{
+  "productId": "demo-product",
+  "name": "虚构演示产品（非品牌商品）",
+  "version": "demo-v1",
+  "dataKind": "demo",
+  "sources": [
+    {
+      "sourceId": "demo-manual",
+      "title": "虚构资料：仅用于验证来源关联",
+      "locator": "demo://fixtures/product-manual",
+      "collectedAt": "2026-09-30T00:00:00Z"
+    }
+  ],
+  "facts": [
+    {
+      "factId": "demo-description",
+      "category": "description",
+      "text": "这是一条虚构的产品说明，用于测试读取、导入与来源追踪，不作为真实商品建议。",
+      "sourceId": "demo-manual",
+      "reviewStatus": "approved"
+    },
+    {
+      "factId": "demo-draft",
+      "category": "usage",
+      "text": "未审核内容示例，知识读取接口应排除这一条。",
+      "sourceId": "demo-manual",
+      "reviewStatus": "draft"
+    }
+  ]
+}

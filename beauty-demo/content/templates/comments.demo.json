@@ -1,0 +1,43 @@
+{
+  "batchId": "demo-batch-001",
+  "productId": "demo-product",
+  "dataKind": "demo",
+  "period": { "from": "2026-03-30", "to": "2026-09-30", "unknownDates": "separate" },
+  "sources": [
+    {
+      "sourceId": "demo-comments-source",
+      "title": "人工编写的格式示例，非采集评论",
+      "locator": "demo://fixtures/comments",
+      "collectedAt": "2026-09-30T00:00:00Z"
+    }
+  ],
+  "comments": [
+    {
+      "commentId": "demo-comment-001",
+      "noteId": "demo-note-001",
+      "text": "虚构示例：使用后感觉紧绷，上底妆时有卡粉。",
+      "publishedAt": "2026-09-01",
+      "collectedAt": "2026-09-30T00:00:00Z",
+      "sourceRef": "demo-comments-source",
+      "tags": ["紧绷", "卡粉"]
+    },
+    {
+      "commentId": "demo-comment-002",
+      "noteId": "demo-note-001",
+      "text": "虚构示例：想咨询退货规则。",
+      "publishedAt": "2026-09-02",
+      "collectedAt": "2026-09-30T00:00:00Z",
+      "sourceRef": "demo-comments-source",
+      "tags": ["售后"]
+    },
+    {
+      "commentId": "demo-comment-003",
+      "noteId": "demo-note-002",
+      "text": "虚构示例：一条原始发布日期不明的评论。",
+      "publishedAt": null,
+      "collectedAt": "2026-09-30T00:00:00Z",
+      "sourceRef": "demo-comments-source",
+      "tags": []
+    }
+  ]
+}

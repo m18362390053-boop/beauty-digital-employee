@@ -1,0 +1,7 @@
+{
+  "id": "replace-with-confirmed-skill-id",
+  "version": "v1",
+  "description": "请业务B填入团队确认的Skill职责、使用场景和边界。",
+  "knowledgeScopes": ["product"],
+  "requiredFields": []
+}
