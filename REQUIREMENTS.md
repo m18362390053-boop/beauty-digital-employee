@@ -15,7 +15,7 @@
 
 工作目录：`beauty-demo/`。
 
-- 运行：Express、Zod、Model Context Protocol SDK。
+- 运行：Express、Zod、Model Context Protocol SDK、fflate（声明式ZIP包）、yaml（SKILL.md头部）。
 - 开发：TypeScript、tsx、Node/Express类型。
 - 浏览器验证：playwright-core，使用已安装的Edge/Chrome；不自动下载浏览器。
 - 安装：`npm ci`；构建：`npm run build`；启动：`npm start`。
@@ -25,6 +25,7 @@
 - TypeSafe API：`TYPESAFE_API_KEY`，模型 `jev-latest`。
 - 回复API：`CHAT_API_KEY`、`CHAT_BASE_URL`、`CHAT_MODEL`，推荐DeepSeek官方 `deepseek-flash`。
 - 密钥从服务端环境或Git忽略的本地文件读取。纯工程测试不需要密钥。
+- 可在网页业务配置中保存模型设置到data/model-settings.json；该配置优先且不进入Git。
 - DeepSeek Harness：可选，已验证 `@deepseek-ai/dsh@0.1.5-rc.3`。
 - Harness自身的主模型连接与客服后端模型连接相互独立。
 
@@ -37,6 +38,8 @@
 | SQLite | `beauty-demo/data/beauty.sqlite` |
 | 本地运行配置 | `beauty-demo/config/local.json`（可选） |
 | 业务演示配置 | `beauty-demo/config/business.demo.json` |
+| 运营口令 | `beauty-demo/data/operator-password.txt`（启动时生成，或用环境变量指定） |
+| MCP后端凭据 | `beauty-demo/data/mcp-credentials-<userId>.json`（仅授权对应用户） |
 | 运行报告 | `beauty-demo/test-results/` |
 
 仅运行一个访问同一数据库的后端实例。服务进程需要能写入data目录。

@@ -23,8 +23,8 @@ export class BeautyApiClient {
     try {
       const response = await this.fetchImpl(`${this.config.apiUrl}${path}`, {
         method: options.method ?? 'GET',
-        headers: options.body === undefined ? { Accept: 'application/json' }
-          : { Accept: 'application/json', 'Content-Type': 'application/json' },
+        headers: { Accept: 'application/json', ...(this.config.apiToken ? { Authorization: `Bearer ${this.config.apiToken}` } : {}),
+          ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
         redirect: 'error',
         signal,
@@ -38,6 +38,7 @@ export class BeautyApiClient {
         const parsed = errorSchema.safeParse(body);
         if (parsed.success) {
           const { code, message, traceId } = parsed.data.error;
+          if (code === 'OPERATOR_LOGIN_REQUIRED') throw new BackendError('BACKEND_AUTH_REQUIRED', 'Run npm run mcp:token and pass BEAUTY_API_TOKEN_FILE; MCP uses a user-scoped credential, not an operator password.', 401, traceId);
           throw new BackendError(code, message, response.status, traceId);
         }
         throw new BackendError('BACKEND_HTTP_ERROR', `Service returned HTTP ${response.status}`, response.status);

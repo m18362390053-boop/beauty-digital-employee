@@ -1,13 +1,15 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { operatorHeaders } from './operator-api.js';
 
 // Explicit paid smoke check: one full consultation, never included in npm test.
 const base = process.env.BEAUTY_API_URL ?? 'http://127.0.0.1:3090';
 const overall = AbortSignal.timeout(90_000);
+const authHeaders = await operatorHeaders(base);
 async function api(path: string, method = 'GET', body?: unknown) {
   const response = await fetch(base + path, {
-    method, headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    method, headers: { ...authHeaders, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body), signal: overall,
   });
   const data = await response.json() as any;

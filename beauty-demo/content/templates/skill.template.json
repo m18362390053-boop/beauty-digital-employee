@@ -3,5 +3,9 @@
   "version": "v1",
   "description": "请业务B填入团队确认的Skill职责、使用场景和边界。",
   "knowledgeScopes": ["product"],
-  "requiredFields": []
+  "requiredFields": [],
+  "intents": ["product_advice"],
+  "instructions": "请业务B填写这个Skill的处理步骤、回答风格与边界。缺少具体资料时应针对用户问题澄清，不编造商品信息。",
+  "requiresKnowledge": false,
+  "knowledge": []
 }

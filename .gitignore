@@ -11,6 +11,10 @@ deepseek_api.txt
 beauty-demo/data/
 beauty-demo/test-results/
 beauty-demo/config/local.json
+**/model-settings.json
+**/model-settings.json.tmp
+**/operator-password.txt
+**/mcp-credentials-*.json
 
 # Local planning/conversation notes are not release artifacts.
 shabi.md

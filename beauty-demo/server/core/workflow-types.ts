@@ -2,20 +2,28 @@ import { z } from 'zod';
 import { idSchema, type Card, type ProductDocument, type RouteDecision, skillDefinitionSchema } from '../contracts/index.js';
 
 const probability = z.number().min(0).max(1);
+export const skillVersionSchema = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/);
+export const businessSkillSchema = skillDefinitionSchema.extend({
+  version: skillVersionSchema,
+  description: z.string().trim().min(1).max(2_000),
+  intents: z.array(idSchema).min(1), instructions: z.string().min(1).max(40_000),
+  requiresKnowledge: z.boolean().default(true),
+  knowledge: z.array(z.object({ title: z.string().min(1).max(200), content: z.string().min(1).max(40_000) }).strict()).max(20).default([]),
+});
 export const businessConfigSchema = z.object({
   version: idSchema, reviewStatus: z.enum(['demo', 'reviewed']), notice: z.string(),
   intents: z.record(idSchema, z.string().min(1)).refine(v => Object.keys(v).length === 4, 'Exactly four business intents'),
   emotions: z.record(idSchema, z.string().min(1)).refine(v => Object.keys(v).length > 0),
   riskLevels: z.object({ low: z.string(), medium: z.string(), high: z.string() }).strict(),
   thresholds: z.object({ intent: probability, skill: probability, risk: probability, human: probability, information: probability }).strict(),
-  skills: z.array(skillDefinitionSchema.extend({ intents: z.array(idSchema).min(1), instructions: z.string().min(1) })).length(3),
+  skills: z.array(businessSkillSchema).max(30),
   rules: z.array(z.object({
     id: idSchema, riskLevel: z.enum(['low', 'medium', 'high']).nullable(),
     phrases: z.array(z.string().min(1)).min(1), ignorePhrases: z.array(z.string().min(1)), message: z.string().min(1),
   }).strict()),
   templates: z.object({ clarify: z.string(), unavailable: z.string(), noKnowledge: z.string(), risk: z.string(), waiting: z.string() }).strict(),
 }).strict().superRefine((v, ctx) => {
-  if (new Set(v.skills.map(s => s.id)).size !== 3) ctx.addIssue({ code: 'custom', path: ['skills'], message: 'Duplicate skill ID' });
+  if (new Set(v.skills.map(s => s.id)).size !== v.skills.length) ctx.addIssue({ code: 'custom', path: ['skills'], message: 'Duplicate skill ID' });
   for (const [i, skill] of v.skills.entries()) {
     if (skill.id === 'other') ctx.addIssue({ code: 'custom', path: ['skills', i], message: 'other is reserved for fallback' });
     if (skill.intents.some(id => !Object.hasOwn(v.intents, id))) ctx.addIssue({ code: 'custom', path: ['skills', i, 'intents'], message: 'Unknown intent' });
@@ -30,14 +38,14 @@ export interface RouteRecord extends RouteDecision {
   reasonCodes: string[]; ruleHits: string[]; model: string | null;
   rawAnswers: unknown; usage: unknown; latencyMs: number;
 }
-export interface DecisionInput { userText: string; card: Card; recentMessages: { role: string; content: string }[] }
+export interface DecisionInput { userText: string; card: Card; recentMessages: { role: string; content: string }[]; selectedProduct?: { id: string; name: string } }
 export interface DecisionProvider {
   configured: boolean;
   decide(input: DecisionInput, config: BusinessConfig, signal: AbortSignal): Promise<RouteRecord>;
 }
 export interface GenerationProvider {
   configured: boolean;
-  generate(input: DecisionInput & { skill: BusinessSkill; knowledge: ProductDocument; comments: unknown[] }, signal: AbortSignal):
+  generate(input: DecisionInput & { skill: BusinessSkill; knowledge: ProductDocument; comments: unknown[]; responseMode?: 'answer' | 'clarify' | 'conversation' }, signal: AbortSignal):
     Promise<{ answer: string; sourceRefs: string[]; model: string; usage: unknown }>;
 }
 export const consultResultSchema = z.object({
@@ -48,6 +56,7 @@ export const consultResultSchema = z.object({
   route: z.record(z.unknown()).nullable(), warnings: z.array(z.string()),
   policyStatus: z.enum(['demo', 'reviewed']), dataKind: z.enum(['demo', 'business']),
   handoffId: idSchema.nullable(), generation: z.record(z.unknown()).nullable(),
+  diagnostics: z.object({ stage: z.enum(['jev', 'chat']), code: z.string(), networkCode: z.string().nullable(), host: z.string().nullable(), attempts: z.number().int() }).optional(),
 });
 export type ConsultResult = z.infer<typeof consultResultSchema>;
 export const feedbackSchema = z.object({ type: z.enum(['helpful', 'unresolved', 'request_human']), reason: z.string().trim().max(500).default('') }).strict();

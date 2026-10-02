@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { idSchema } from '../server/contracts/index.js';
 import { consultResultSchema } from '../server/core/workflow-types.js';
 import { mcpConfig } from '../server/mcp/config.js';
+import { operatorHeaders } from './operator-api.js';
+import { provisionMcp } from './provision-mcp.js';
 
 const path = process.argv[2];
 if (!path) throw new Error('Usage: npm run verify:live-mcp -- test-results/live-check-<requestId>.json');
@@ -14,10 +16,12 @@ const report = z.object({ userId: idSchema, sessionId: idSchema, requestId: idSc
   .parse(JSON.parse(await readFile(resolve(path), 'utf8')));
 if (report.result.status !== 'answered') throw new Error('Choose a successful live-check report.');
 const config = mcpConfig();
+const authHeaders = await operatorHeaders(config.apiUrl);
+const credential = await provisionMcp(report.userId, config.apiUrl);
 const signal = AbortSignal.timeout(30_000);
 const prefix = `${config.apiUrl}/api/users/${report.userId}/sessions/${report.sessionId}`;
 const get = async (suffix: string) => {
-  const response = await fetch(prefix + suffix, { signal });
+  const response = await fetch(prefix + suffix, { signal, headers: authHeaders });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json() as Promise<any>;
 };
@@ -31,7 +35,7 @@ const client = new Client({ name: 'live-result-mcp-verifier', version: '1.0.0' }
 try {
   await client.connect(new StdioClientTransport({ command: process.execPath,
     args: [resolve('dist/server/mcp/index.js')],
-    env: { BEAUTY_API_URL: config.apiUrl, BEAUTY_USER_ID: report.userId },
+    env: { BEAUTY_API_URL: config.apiUrl, BEAUTY_USER_ID: report.userId, BEAUTY_API_TOKEN_FILE: credential.tokenFile },
   }));
   const result = await client.callTool({ name: 'customer_service_consult', arguments: {
     sessionId: report.sessionId, requestId: report.requestId, content: original.content,

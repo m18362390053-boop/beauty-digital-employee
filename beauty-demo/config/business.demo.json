@@ -1,5 +1,5 @@
 {
-  "version": "demo-policy-v2",
+  "version": "demo-policy-v3",
   "reviewStatus": "demo",
   "notice": "用于开发验证的暂定分类、阈值和提示词，需业务B确认后替换，不属于正式金标或品牌话术。",
   "intents": {
@@ -30,6 +30,7 @@
     },
     {
       "id": "emotional_support", "version": "demo-v1", "description": "用户情绪和反馈承接",
+      "requiresKnowledge": false,
       "knowledgeScopes": ["product"], "requiredFields": [],
       "intents": ["emotional_support"],
       "instructions": "演示配置：简短理解用户情绪，不假装真人，不做医疗或心理诊断，不添加没有依据的产品效果。"

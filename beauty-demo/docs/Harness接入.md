@@ -23,18 +23,20 @@ MCP只调用HTTP，不直接打开数据库，因此与网页、API使用同一�
 .\start-harness.ps1
 ```
 
-脚本会检查数据库健康、绑定用户及产品，然后启动带有新MCP配置的Harness。
+脚本会检查数据库健康并为已存在的绑定用户申请访问凭据，然后启动带有新MCP配置的Harness。请先在运营端或seed命令初始化产品和演示用户。
+脚本也会使用本机运营口令申请仅绑定指定用户的MCP访问凭据。运营口令和访问Token均不传给模型、不打印到终端。
 使用这次自动打开的网页，或终端打印的带token完整地址；新会话选择标准模式和已配置好的DeepSeek模型。
 数据工具不需要TypeSafe Key。Harness自身的模型仍使用你已经配置的模型凭据。
 保持两个终端窗口运行；关闭Harness不会停止3090后端。
 
 默认绑定 `demo-user-a`。绑定身份由启动配置决定，不接受模型传入任意userId。
 用户B隔离演示可以用 `-UserId demo-user-b -Port 3003` 启动另一个Harness实例。
-这是本机演示身份隔离，尚不是正式登录认证。
+后端会校验MCP凭据绑定的userId；修改工具环境中的userId不能越权访问其他用户。网页客户使用独立匿名Cookie身份。
 
 等价命令：
 
 ```powershell
+npm run mcp:token -- --user demo-user-a
 dsh --profile web --patch ./harness.patch.yml --host 127.0.0.1 --port 3002
 ```
 
@@ -65,7 +67,7 @@ dsh --profile web --patch ./harness.patch.yml --host 127.0.0.1 --port 3002
 
 > 请先用mcp__beauty__create_session创建会话，再调用mcp__beauty__customer_service_consult，传入原话“用了以后脸肿了，请转人工”。保留返回的风险提示和状态，展示真实runId与handoffId。如果是rule_override，说明是规则命中；如果是pending，只能说等待人工，不要继续推荐产品。
 
-该演示通过显式规则即可完成，不消耗Jev或回复模型额度。人工接管可在 http://127.0.0.1:3090/demo/ 操作。
+该演示通过显式规则即可完成，不消耗Jev或回复模型额度。人工接管需登录 http://127.0.0.1:3090/ops/ 操作。
 普通问题要真实调用Jev和回复模型，需在3090后端终端配置两套密钥，详见README。
 
 ### 1. 只读验收
@@ -108,6 +110,8 @@ npm run smoke:mcp
 - `USER_NOT_FOUND`：绑定用户不存在；演示库先执行 `npm run seed:demo`，业务库应创建对应用户。
 - `CARD_VERSION_CONFLICT`：版本已更新；重新读取、保留仍有效内容后再保存。
 - `SESSION_NOT_FOUND`：会话ID不属于当前绑定用户或不存在。
+- `BACKEND_AUTH_REQUIRED` / `INVALID_API_TOKEN`：重新运行npm run mcp:token，并传入BEAUTY_API_TOKEN_FILE；不要把模型Key当作后端访问Token。
+- `MCP_SCOPE_DENIED`：凭据不允许这个用户或运营接口，不能通过更改userId绕过。
 - Harness找不到工具：确认是新启动的带beauty patch页面，而不是原3000/3001实例。
 
 工具异常使用MCP `isError: true` 返回；不会自动重试写请求。超时/取消不保证远端写操作未发生，先查询状态再决定是否重试。

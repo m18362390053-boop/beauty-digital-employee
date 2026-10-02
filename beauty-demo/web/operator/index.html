@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>美妆客服 · 运营工作台</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <script type="module" src="/ops/app.js"></script>
+</head>
+<body>
+  <section id="operator-login" class="panel login-panel">
+    <div class="eyebrow">OPERATOR CONSOLE</div><h1>运营工作台</h1>
+    <p>使用运营口令登录。口令位于启动终端提示的本机文件中，不是模型API Key。</p>
+    <form id="operator-login-form"><label for="operator-password">运营口令</label><input id="operator-password" type="password" autocomplete="current-password" required><button class="primary">登录运营端</button></form>
+    <p id="operator-login-message" role="status"></p><a href="/chat/">进入用户客服端</a>
+  </section>
+  <div id="operator-workspace" hidden>
+  <header>
+    <div><div class="eyebrow">BEAUTY OPERATIONS</div><h1>运营与业务验收</h1><p>Skill、知识、坐席与可追溯执行记录 · <a href="/chat/" target="_blank" rel="noopener">打开用户端</a></p></div>
+    <div class="health"><span id="health">连接中…</span><small id="provider-status"></small><button id="operator-logout">退出运营端</button></div>
+  </header>
+  <div id="notice" class="notice">正在读取配置…</div>
+  <nav aria-label="工作台导航">
+    <button data-page="chat" class="selected">客服测试</button>
+    <button data-page="card">用户资料卡</button>
+    <button data-page="handoff">人工接管</button>
+    <button data-page="dashboard">风险看板</button>
+    <button data-page="setup">业务配置 · Skill上传</button>
+    <button data-page="runs">执行记录</button>
+  </nav>
+  <div id="notification" role="status" aria-live="polite"></div>
+  <div id="setup-warning" class="notice" hidden></div>
+  <main>
+    <section id="page-chat" class="page">
+      <div class="toolbar">
+        <label>演示用户<select id="user-select" aria-label="演示用户"></select></label>
+        <label class="grow">会话<select id="session-select" aria-label="会话"></select></label>
+        <button id="new-session">新建会话</button>
+        <span id="session-status" class="badge">尚无会话</span>
+      </div>
+      <p id="expected-skill" class="muted small">这是运营测试台，可选择测试用户；实际用户端不会显示用户切换与调试JSON。</p>
+      <div class="columns">
+        <article class="panel conversation">
+          <div id="messages" aria-live="polite"><p class="muted">新建一个会话开始。</p></div>
+          <form id="chat-form">
+            <label for="message-input">您的问题</label>
+            <textarea id="message-input" rows="3" maxlength="10000" placeholder="例如：我想了解这个产品的使用方法。"></textarea>
+            <div class="actions"><button class="primary" id="send-message">发送咨询</button><button type="button" id="stop-request" disabled>停止等待</button><button type="button" id="request-human">转人工</button><button type="button" id="check-run">查询上次请求</button></div>
+          </form>
+          <p class="muted small">未配置模型时会明确返回降级提示，不生成模拟答案。人工处理中，AI保持暂停。</p>
+        </article>
+        <aside>
+          <article class="panel"><h2>当前用户记忆</h2><div id="memory-preview"></div></article>
+          <article class="panel"><h2>处理过程</h2><div id="run-summary">发送咨询后展示实际处理结果。</div><details><summary>开发调试JSON</summary><pre id="route-result"></pre></details></article>
+          <article class="panel"><h2>产品依据</h2><div id="knowledge"></div></article>
+        </aside>
+      </div>
+    </section>
+    <section id="page-card" class="page" hidden>
+      <article class="panel narrow">
+        <h2>用户资料卡</h2><p id="card-owner" class="muted"></p>
+        <p class="small">只保存用户确认的信息。同一用户的新会话会读到这些资料。</p>
+        <form id="card-form">
+          <label for="preferences">服务偏好（每行一项）</label><textarea id="preferences" rows="3"></textarea>
+          <label for="concerns">关注点（每行一项）</label><textarea id="concerns" rows="3"></textarea>
+          <label for="confirmed-facts">已确认事实（JSON，保留来源消息ID）</label><textarea id="confirmed-facts" rows="7" spellcheck="false"></textarea>
+          <div class="actions"><button class="primary">保存确认信息</button><button type="button" id="reload-card">重新读取</button></div>
+        </form>
+        <p class="muted small">保存使用版本检查；冲突时先重新读取，避免覆盖其他更新。</p>
+      </article>
+    </section>
+    <section id="page-handoff" class="page" hidden>
+      <div class="toolbar"><div><h2>本地人工接管台</h2><p class="muted">由演示人员实际接管和回复。等待接管不代表已有真人在线。</p></div><button id="refresh-handoffs">刷新队列</button></div>
+      <div id="handoffs"></div>
+    </section>
+    <section id="page-dashboard" class="page" hidden>
+      <div class="toolbar"><div><h2>风险与反馈看板</h2><p id="metrics-time" class="muted"></p></div><button id="refresh-dashboard">刷新统计</button></div>
+      <div id="metrics"></div>
+      <article class="panel"><h2>评论标签与来源</h2><p class="muted small">分母为去重评论数；一条评论可有多个标签，占比之和可以超过100%。</p><div id="tag-table"></div></article>
+      <div class="columns"><article class="panel"><h2>发布时间趋势</h2><div id="trend-table"></div></article><article class="panel"><h2>标签共现</h2><div id="pair-table"></div></article></div>
+      <article class="panel"><h2>风险会话 / 运行ID</h2><div id="risk-table"></div></article>
+      <details class="panel"><summary>完整统计与追溯数据</summary><pre id="metrics-json"></pre></details>
+    </section>
+    <section id="page-setup" class="page" hidden>
+      <div class="toolbar"><div><h2>业务配置</h2><p class="muted">先连通模型，再上传Skill。保存后立即生效，不必修改源码或重启。</p></div><button id="refresh-setup">刷新状态</button></div>
+      <p class="small muted">首次运行还没有用户和产品？<button type="button" id="initialize-demo">初始化演示数据</button> 保留已有记录，不覆盖真实业务产品。</p>
+      <div class="columns">
+        <article class="panel">
+          <h2>1 · 模型连接</h2><p id="models-summary" class="small muted"></p>
+          <form id="model-form" autocomplete="off">
+            <label for="typesafe-key">TypeSafe / Jev API Key（留空保留原值）</label><input id="typesafe-key" type="password" autocomplete="new-password" placeholder="粘贴你的TypeSafe API Key">
+            <label for="chat-key">回复模型 API Key（留空保留原值）</label><input id="chat-key" type="password" autocomplete="new-password" placeholder="粘贴DeepSeek或兼容服务API Key">
+            <label for="chat-url">回复API Base URL</label><input id="chat-url" type="url" value="https://api.deepseek.com/v1" required>
+            <label for="chat-model">回复模型名</label><input id="chat-model" value="deepseek-flash" required>
+            <div class="actions"><button class="primary">保存模型配置</button><button type="button" id="check-models">验证连接（少量额度）</button></div>
+          </form>
+          <p class="small muted">请先保存，再验证（验证使用已保存的配置）。密钥只保存到本机后端的data目录，不会显示在页面响应或写入Git。组员本地运行时需要自己的或团队提供的密钥。</p>
+          <pre id="model-check-result">尚未验证连接</pre>
+        </article>
+        <article class="panel">
+          <h2>2 · 上传 Skill</h2>
+          <p class="small">支持SKILL.md、Skill JSON，以及包含SKILL.md/manifest.json/knowledge的ZIP。只加载声明式内容，不执行脚本。</p>
+          <p><a href="/api/skills/template.zip" download>下载可直接导入的ZIP模板</a></p>
+          <form id="skill-upload-form">
+            <label for="skill-file">Skill文件</label><input id="skill-file" type="file" accept=".md,.json,.zip" required>
+            <label for="skill-id">Skill ID（可留空，使用文件中的name/id）</label><input id="skill-id" placeholder="例如 makeup-guide" pattern="[A-Za-z0-9_-]+">
+            <label for="skill-version">版本（可留空，使用文件定义或自动生成）</label><input id="skill-version" placeholder="例如 1.0.0；修改内容后增加版本">
+            <label for="skill-description">职责描述（可留空，使用文件定义）</label><input id="skill-description" placeholder="告诉Jev这个Skill适合什么问题" maxlength="2000">
+            <label for="skill-intent">意图类别</label><select id="skill-intent"><option value="">使用文件定义</option></select>
+            <label for="skill-requires-knowledge">是否必须有知识依据才能直接回答</label><select id="skill-requires-knowledge"><option value="">使用文件定义（Markdown默认否）</option><option value="true">是：产品事实、售后政策等</option><option value="false">否：寒暄、情绪承接、咨询追问等</option></select>
+            <div class="actions"><button class="primary">导入并启用 Skill</button></div>
+          </form>
+          <p class="small muted">相同ID表示更新；有明确version时，修改内容请增加版本。上传后的知识可被选中Skill实际引用。</p>
+        </article>
+      </div>
+      <article class="panel"><h2>3 · 已注册的 Skill</h2><div id="skill-list"></div></article>
+      <article class="panel"><h2>4 · 产品知识文件</h2><p class="small muted">上传符合product.demo.json格式的JSON，可新增当前产品版本。初期也可把知识写入Skill ZIP的knowledge目录。</p>
+        <form id="product-upload-form"><label for="product-file">产品知识 JSON</label><input id="product-file" type="file" accept=".json" required><button class="primary">导入产品知识</button></form>
+      </article>
+    </section>
+    <section id="page-runs" class="page" hidden>
+      <div class="toolbar"><div><h2>Agent 执行记录</h2><p class="muted">检查档案、决策、Skill版本、知识片段与真实动作；不展示模型内部思维链。</p></div><button id="refresh-runs">刷新记录</button></div>
+      <div class="toolbar"><label class="grow">选择一次执行<select id="run-select"></select></label><button id="load-run">查看执行证据</button></div>
+      <div id="run-detail"></div>
+    </section>
+  </main>
+  <footer>真实数据接口 · 演示资料明确标注 · Jev调度与回复模型分别配置</footer>
+  </div>
+</body>
+</html>

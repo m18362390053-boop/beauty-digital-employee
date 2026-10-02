@@ -7,7 +7,9 @@ import type { AddressInfo } from 'node:net';
 import { Store } from '../server/storage/store.js';
 import { createApp } from '../server/app.js';
 import { AppError } from '../server/core/errors.js';
-import { productSchema, commentBatchSchema, insightSchema, evaluationCaseSchema, skillDefinitionSchema } from '../server/contracts/index.js';
+import { productSchema, commentBatchSchema, insightSchema, evaluationCaseSchema } from '../server/contracts/index.js';
+import { businessSkillSchema } from '../server/core/workflow-types.js';
+import { testAccess, loginOperator } from './access-helper.js';
 
 const load = async (name: string) => JSON.parse(await readFile(resolve('content/templates', name), 'utf8'));
 const isCode = (code: string) => (error: unknown) => error instanceof AppError && error.code === code;
@@ -15,7 +17,7 @@ const isCode = (code: string) => (error: unknown) => error instanceof AppError &
 async function fixture(t: TestContext) {
   const dir = await mkdtemp(join(tmpdir(), 'beauty-foundation-'));
   const store = new Store(join(dir, 'test.sqlite'));
-  const server = createApp(store).listen(0, '127.0.0.1');
+  const server = createApp(store, undefined, { access: testAccess(store) }).listen(0, '127.0.0.1');
   await new Promise<void>((resolveReady, reject) => {
     server.once('listening', resolveReady);
     server.once('error', reject);
@@ -29,10 +31,11 @@ async function fixture(t: TestContext) {
     await rm(dir, { recursive: true, force: true });
   });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const headers = await loginOperator(base);
   async function request(path: string, method = 'GET', input?: unknown) {
     const response = await fetch(base + path, {
       method,
-      headers: input === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: { ...headers, ...(input === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: input === undefined ? undefined : JSON.stringify(input),
     });
     return { status: response.status, body: await response.json() as any, traceId: response.headers.get('x-trace-id') };
@@ -44,7 +47,7 @@ test('business templates validate and insight counts refer to supplied comments'
   const product = productSchema.parse(await load('product.demo.json'));
   const batch = commentBatchSchema.parse(await load('comments.demo.json'));
   const insights = insightSchema.parse(await load('insights.demo.json'));
-  skillDefinitionSchema.parse(await load('skill.template.json'));
+  businessSkillSchema.parse(await load('skill.template.json'));
   evaluationCaseSchema.array().parse(await load('cases.demo.json'));
   assert.equal(product.productId, batch.productId);
   assert.equal(insights.sampleSize, batch.comments.length);
@@ -227,7 +230,9 @@ test('SQLite persistence survives closing/reopening, and duplicate imports stay 
 test('API returns health, bounded pagination and structured malformed JSON errors', async t => {
   const { request, base } = await fixture(t);
   assert.equal((await request('/health')).body.database, true);
-  assert.equal((await request('/')).body.phase, 'foundation');
+  const home = await fetch(base + '/');
+  assert.ok(home.url.endsWith('/chat/'));
+  assert.match(await home.text(), /专属美妆顾问/);
   assert.equal((await request('/api/products/demo-product/comments?limit=0')).status, 422);
   assert.equal((await request('/not-a-route')).status, 404);
   const malformed = await fetch(`${base}/api/users`, {

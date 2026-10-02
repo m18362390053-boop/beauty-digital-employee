@@ -7,3 +7,7 @@ data/
 *.log
 test-results/
 config/local.json
+model-settings.json
+model-settings.json.tmp
+operator-password.txt
+mcp-credentials-*.json

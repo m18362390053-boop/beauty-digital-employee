@@ -1,6 +1,7 @@
 # 基础API v0.1
 
-本文保留基础数据接口。新增咨询、人工、反馈、看板接口见 [阶段三使用](阶段三使用.md)，数据库当前schemaVersion为2。
+本文保留基础数据接口。数据库当前schemaVersion为4。下列旧接口受运营登录或用户绑定MCP凭据保护，不能再匿名调用。
+公开用户端使用 `/api/customer/*`，身份由Cookie绑定，不在路径中传userId。权限与新接口见 [双端权限与Skill验收](双端权限与Skill验收.md)。根地址进入/chat/，旧/demo/进入/ops/。
 
 基址：`http://127.0.0.1:3090`。请求采用JSON；错误统一 `{ "error": { "code", "message", "traceId", "issues"? } }`。
 422的 `issues[].path` 可定位到如 `comments.1.sourceRef` 的具体输入；验证失败整批不写入。
@@ -60,5 +61,5 @@ ID只允许字母、数字、下划线、短横线，最长100字符。示例请
 仅接受 `requestId` 与 `content`，不允许客户端伪装 `assistant` 或 `human` 角色。
 同会话同 `requestId` 同内容返回同一 `messageId`，重复提交不同内容返回409。
 会话ID与路径userId不匹配时返回404，读消息、写消息、读取上下文均检查。
-这些检查是数据归属保护，不代替登录认证；同机演示操作者可以选择任意演示用户。
+这些接口需要经过运营或MCP身份校验；运营测试台可选择测试用户，公开用户端不能切换身份。
 当前消息返回 `processing: not_implemented`，没有业务路由或AI回复。

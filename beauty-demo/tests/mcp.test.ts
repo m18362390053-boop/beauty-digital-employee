@@ -12,6 +12,7 @@ import { Workflows } from '../server/storage/workflows.js';
 import { createApp } from '../server/app.js';
 import { BeautyApiClient, BackendError } from '../server/mcp/api-client.js';
 import { mcpConfig } from '../server/mcp/config.js';
+import { testAccess } from './access-helper.js';
 
 const load = async (name: string) => JSON.parse(await readFile(resolve('content/templates', name), 'utf8'));
 async function fixture(t: TestContext, seeded = true) {
@@ -20,10 +21,11 @@ async function fixture(t: TestContext, seeded = true) {
   if (seeded) {
     store.importProduct(await load('product.demo.json'));
     store.importComments(await load('comments.demo.json'));
-    store.createUser({ userId: 'user-a', displayName: 'User A' });
-    store.createUser({ userId: 'user-b', displayName: 'User B' });
   }
-  const server = createApp(store).listen(0, '127.0.0.1');
+  store.createUser({ userId: 'user-a', displayName: 'User A' });
+  store.createUser({ userId: 'user-b', displayName: 'User B' });
+  const access = testAccess(store);
+  const server = createApp(store, undefined, { access }).listen(0, '127.0.0.1');
   await new Promise<void>((resolveReady, reject) => {
     server.once('listening', resolveReady);
     server.once('error', reject);
@@ -45,7 +47,7 @@ async function fixture(t: TestContext, seeded = true) {
     await client.connect(new StdioClientTransport({
       command: process.execPath,
       args: [resolve('dist/server/mcp/index.js')],
-      env: { BEAUTY_API_URL: apiUrl, BEAUTY_USER_ID: userId },
+      env: { BEAUTY_API_URL: apiUrl, BEAUTY_USER_ID: userId, BEAUTY_API_TOKEN: access.issueMcp(userId).token },
     }));
     return client;
   }

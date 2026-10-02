@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>专属美妆顾问</title><link rel="stylesheet" href="/shared/styles.css"><script type="module" src="/chat/app.js"></script></head>
+<body>
+  <header class="customer-shell"><div><div class="eyebrow">YOUR BEAUTY COMPANION</div><h1>你好，很高兴为你服务。</h1><p>聊聊产品、使用感受，或让我们帮你联系人工。</p></div><span id="service-status" class="badge">连接中</span></header>
+  <main class="customer-shell">
+    <div id="customer-notice" class="notice" role="status" aria-live="polite"></div>
+    <div class="toolbar"><label class="grow">我的咨询记录<select id="sessions" aria-label="我的咨询记录"></select></label><button id="new-session">开始新咨询</button><span id="session-state" class="badge"></span></div>
+    <article class="panel">
+      <div id="messages" class="customer-messages" aria-live="polite"></div>
+      <form id="send-form"><label for="message">想问些什么？</label><textarea id="message" rows="3" maxlength="10000" placeholder="例如：想了解这款产品怎么使用。" required></textarea><div class="actions"><button id="send" class="primary">发送</button><button id="cancel" type="button" disabled>停止等待</button><button id="human" type="button">联系人工</button><button id="check" type="button" hidden>查看上次处理结果</button></div></form>
+    </article>
+    <details class="panel" id="profile"><summary>我的偏好与资料</summary><p class="small muted">只保存你确认的信息，用于下次提供更贴合的服务。可随时在这里修改或清空。</p>
+      <form id="card-form"><label for="preferences">偏好（每行一项）</label><textarea id="preferences" rows="2" placeholder="例如：喜欢清爽的质地"></textarea><label for="concerns">关注点（每行一项）</label><textarea id="concerns" rows="2"></textarea><div id="facts"></div><button class="primary">保存我的资料</button></form>
+    </details>
+    <p class="small muted">本演示通过当前浏览器保存匿名身份；清除浏览器Cookie后无法自动找回原身份。</p>
+  </main><footer class="customer-shell">依据可用资料回答 · 不确定时会向你确认 · 支持人工服务</footer>
+</body></html>

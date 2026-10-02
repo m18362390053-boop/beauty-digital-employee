@@ -23,7 +23,7 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
     const version = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
-    if (version.user_version > 2) {
+    if (version.user_version > 4) {
       this.db.close();
       throw new Error('Database schema is newer than this application');
     }
@@ -92,10 +92,47 @@ export class Store {
         PRAGMA user_version = 2;
       `);
     });
+    if (version.user_version < 3) this.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS skill_packages (
+          id TEXT PRIMARY KEY, document TEXT NOT NULL, enabled INTEGER NOT NULL CHECK(enabled IN(0,1)), updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS skill_package_versions (
+          id TEXT NOT NULL, version TEXT NOT NULL, document TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(id, version)
+        );
+        PRAGMA user_version = 3;
+      `);
+    });
+    if (version.user_version < 4) this.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS access_sessions (
+          hash TEXT PRIMARY KEY, role TEXT NOT NULL CHECK(role IN ('customer','operator')),
+          user_id TEXT REFERENCES users(id), csrf TEXT NOT NULL, expires_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS api_credentials (
+          id TEXT PRIMARY KEY, hash TEXT UNIQUE NOT NULL, user_id TEXT NOT NULL REFERENCES users(id), expires_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS access_state (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS run_events (
+          sequence INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL REFERENCES consultation_runs(id),
+          kind TEXT NOT NULL, title TEXT NOT NULL, details TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS run_snapshots (
+          run_id TEXT PRIMARY KEY REFERENCES consultation_runs(id), card_json TEXT,
+          skill_json TEXT, knowledge_json TEXT, policy_version TEXT
+        );
+        CREATE TABLE IF NOT EXISTS skill_audit (
+          sequence INTEGER PRIMARY KEY AUTOINCREMENT, skill_id TEXT NOT NULL, version TEXT NOT NULL,
+          action TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        PRAGMA user_version = 4;
+      `);
+    });
   }
 
   close() { this.db.close(); }
-  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 2 }; }
+  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 4 }; }
 
   private transaction<T>(work: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');

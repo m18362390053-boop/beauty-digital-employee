@@ -44,6 +44,8 @@ test('DeepSeek Flash requests disable thinking and require JSON; generic provide
   for (const baseUrl of ['https://api.deepseek.com/v1', 'https://other.example/v1']) {
     const provider = new ChatProvider({ apiKey: 'test-key', baseUrl, model: 'deepseek-flash' }, async (_url, init) => {
       const body = JSON.parse(String(init?.body));
+      assert.match(body.messages[0].content, /sourceRefs允许的精确ID列表/);
+      assert.equal(JSON.parse(body.messages[1].content).skill.knowledge, undefined);
       if (baseUrl.includes('api.deepseek.com')) {
         assert.deepEqual(body.thinking, { type: 'disabled' });
         assert.deepEqual(body.response_format, { type: 'json_object' });

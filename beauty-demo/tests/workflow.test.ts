@@ -12,6 +12,7 @@ import { JevProvider, ChatProvider, ProviderError } from '../server/core/provide
 import { businessConfigSchema, type DecisionProvider, type GenerationProvider, type RouteRecord } from '../server/core/workflow-types.js';
 import { createApp } from '../server/app.js';
 import { AppError } from '../server/core/errors.js';
+import { testAccess, loginOperator } from './access-helper.js';
 
 const config = loadBusinessConfig();
 const load = async (name: string) => JSON.parse(await readFile(resolve('content/templates', name), 'utf8'));
@@ -192,15 +193,15 @@ test('feedback is replaceable, triggers handoff and preserves traceable separate
   assert.equal(dashboard.service.helpfulRate, null);
 });
 
-test('v1 database upgrades to v2 without losing cards/messages, and interrupted jobs recover without replaying models', async t => {
+test('v1 database upgrades without losing cards/messages, and interrupted jobs recover without replaying models', async t => {
   const { store, dir, sessionId } = await fixture(t);
   store.updateCard('user-a', { expectedVersion: 0, preferences: ['清爽'] });
   store.appendUserMessage('user-a', sessionId, { requestId: 'saved', content: '旧版消息' });
-  store.db.exec(`DROP TABLE feedback; DROP TABLE handoffs; DROP TABLE consultation_runs; ALTER TABLE messages DROP COLUMN metadata; PRAGMA user_version=1;`);
+  store.db.exec(`DROP TABLE run_events; DROP TABLE run_snapshots; DROP TABLE feedback; DROP TABLE handoffs; DROP TABLE consultation_runs; ALTER TABLE messages DROP COLUMN metadata; PRAGMA user_version=1;`);
   // A second handle simulates the upgrade while the old handle is idle.
   const upgraded = new Store(join(dir, 'test.sqlite'));
   try {
-    assert.equal(upgraded.health().schemaVersion, 2);
+    assert.equal(upgraded.health().schemaVersion, 4);
     assert.deepEqual(upgraded.getCard('user-a').preferences, ['清爽']);
     assert.equal(upgraded.listMessages('user-a', sessionId, 20, 0).items[0]?.content, '旧版消息');
     const work = new Workflows(upgraded);
@@ -212,18 +213,19 @@ test('v1 database upgrades to v2 without losing cards/messages, and interrupted 
 
 test('HTTP consult, operator actions and dashboard use real app contracts', async t => {
   const { service, store, sessionId } = await fixture(t);
-  const server = createApp(store, service).listen(0, '127.0.0.1');
+  const server = createApp(store, service, { access: testAccess(store) }).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
   try {
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    const post = (path: string, body: unknown) => fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const headers = await loginOperator(base);
+    const post = (path: string, body: unknown) => fetch(base + path, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const response = await post(`/api/users/user-a/sessions/${sessionId}/consult`, { requestId: 'api', content: '转人工' });
     assert.equal(response.status, 200);
     const result = await response.json() as { handoffId: string };
     assert.equal((await post(`/api/handoffs/${result.handoffId}/claim`, {})).status, 200);
     assert.equal((await post(`/api/handoffs/${result.handoffId}/reply`, { requestId: 'reply', content: '人工消息' })).status, 200);
-    assert.equal((await fetch(base + '/api/dashboard')).status, 200);
-    assert.equal((await fetch(base + '/api/status')).status, 200);
+    assert.equal((await fetch(base + '/api/dashboard', { headers })).status, 200);
+    assert.equal((await fetch(base + '/api/status', { headers })).status, 200);
   } finally {
     await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
   }

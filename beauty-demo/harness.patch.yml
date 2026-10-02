@@ -10,6 +10,7 @@
         env:
           BEAUTY_API_URL: !!js 'process.env.BEAUTY_API_URL || "http://127.0.0.1:3090"'
           BEAUTY_USER_ID: !!js 'process.env.BEAUTY_USER_ID || "demo-user-a"'
+          BEAUTY_API_TOKEN_FILE: !!js 'process.env.BEAUTY_API_TOKEN_FILE || `${process.cwd()}/data/mcp-credentials-${process.env.BEAUTY_USER_ID || "demo-user-a"}.json`'
           BEAUTY_API_TIMEOUT_MS: '10000'
         toolCallTimeoutMs: 75000
         failOnStartupError: true
