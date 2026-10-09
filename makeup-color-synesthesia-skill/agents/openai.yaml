@@ -1,0 +1,3 @@
+interface:
+  display_name: "美妆色彩通感补偿"
+  short_description: "把美妆色号转成可理解、可播报的无障碍描述"
