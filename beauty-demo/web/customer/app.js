@@ -23,6 +23,7 @@ async function sessions() {
   $('sessions').value = state.sessionId; await messages();
 }
 async function newSession() {
+  state.productId = $('product-select').value || state.productId;
   if (!state.productId) { notice('客服资料正在准备中，请稍后再来。'); return false; }
   const result = await api('/api/customer/sessions', 'POST', { productId: state.productId }); state.sessionId = result.sessionId; await sessions(); return true;
 }
@@ -35,6 +36,19 @@ async function messages() {
   for (const message of result.items) {
     const bubble = el('div', undefined, `message ${message.role}`); bubble.append(el('div', roles[message.role], 'meta'), el('div', message.content));
     for (const source of message.sources ?? []) bubble.append(el('span', `依据：${source.title}`, 'source-label'));
+    if (message.productCards?.length) {
+      const cards = el('div', undefined, 'product-cards');
+      for (const product of message.productCards) {
+        const card = el('article', undefined, 'product-card');
+        if (product.imageUrl) { const image = el('img'); image.src = product.imageUrl; image.alt = product.name; image.loading = 'lazy'; card.append(image); }
+        card.append(el('strong', product.name), el('p', `${product.shade} · ${product.texture}`),
+          el('p', product.dataKind === 'demo' ? '演示商品，仅用于测试推荐流程' : '已审核商品资料', 'small muted'));
+        if (product.price !== undefined) card.append(el('p', `参考价格 ¥${product.price}`, 'small'));
+        card.append(el('p', `资料依据：${product.sourceId}`, 'small muted'));
+        cards.append(card);
+      }
+      bubble.append(cards);
+    }
     if (['assistant', 'human'].includes(message.role)) {
       const buttons = el('div', undefined, 'actions');
       for (const [text, type] of [['有帮助', 'helpful'], ['没解决', 'unresolved'], ['需要人工', 'request_human']]) {
@@ -84,6 +98,12 @@ $('check').addEventListener('click', () => safely(async () => { if (!state.pendi
 safely(async () => {
   const auth = await api('/api/auth/customer/start', 'POST', {}); state.csrf = auth.csrfToken;
   const info = await api('/api/customer/bootstrap'); state.productId = info.products[0]?.productId ?? '';
+  $('product-select').replaceChildren();
+  for (const product of info.products) {
+    const option = el('option', `${product.name}${product.dataKind === 'demo' ? ' · 演示' : ''}`); option.value = product.productId;
+    $('product-select').append(option);
+  }
+  $('product-select').value = state.productId;
   $('service-status').textContent = !state.productId ? '服务准备中' : info.serviceAvailable ? '欢迎咨询' : '可留言或联系人工';
   notice(!state.productId ? '客服资料正在准备中，请稍后再来。' : info.products[0]?.dataKind === 'demo' ? '当前为演示资料，我们会明确区分示例与真实商品信息。' : '有什么问题，随时告诉我。');
   renderCard(info.card); await sessions();

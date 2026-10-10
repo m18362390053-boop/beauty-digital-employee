@@ -50,11 +50,15 @@ test('browser: card memory, real UI consult, feedback, human takeover and tracea
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     await operatorLogin(page, base);
     await page.locator('#user-select option').first().waitFor({ state: 'attached' });
+    const openedCard = page.waitForResponse(r => r.url().endsWith('/card') && r.request().method() === 'GET');
     await page.getByRole('button', { name: '用户资料卡', exact: true }).click();
+    await openedCard;
     await page.locator('#preferences').fill('清爽\n简单步骤');
     const saved = page.waitForResponse(r => r.url().endsWith('/card') && r.request().method() === 'PATCH');
     await page.getByRole('button', { name: '保存确认信息' }).click();
-    assert.equal((await saved).status(), 200);
+    const savedResponse = await saved;
+    assert.equal(savedResponse.status(), 200);
+    assert.deepEqual((await savedResponse.json()).preferences, ['清爽', '简单步骤']);
     await page.getByRole('button', { name: '客服测试', exact: true }).click();
     const newSession = page.waitForResponse(r => r.url().endsWith('/sessions') && r.request().method() === 'POST');
     await page.getByRole('button', { name: '新建会话', exact: true }).click();
@@ -237,8 +241,48 @@ test('browser: separate customer/operator contexts share a real handoff without 
     await customer.screenshot({ path: resolve('test-results/customer-ui.png'), fullPage: true });
     await operator.getByRole('button', { name: '执行记录', exact: true }).click();
     await operator.getByRole('heading', { name: '真实执行时间线' }).waitFor();
+    const downloadPromise = operator.waitForEvent('download');
+    await operator.getByRole('button', { name: '下载 JSON', exact: true }).last().click();
+    const downloaded = await downloadPromise;
+    assert.match(downloaded.suggestedFilename(), /^beauty-run-.+\.json$/);
     await operator.screenshot({ path: resolve('test-results/operator-ui.png'), fullPage: true });
     await customerContext.close(); await opsContext.close();
+  } finally {
+    await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
+    store.close(); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('browser: customer sees sourced product cards after one guide clarification', {
+  timeout: 60_000, skip: !executablePath && 'Set BROWSER_PATH',
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'beauty-cards-ui-')); const store = new Store(join(dir, 'ui.sqlite'));
+  store.importProduct(JSON.parse(await readFile(resolve('content/templates/product.demo.json'), 'utf8')));
+  for (const product of JSON.parse(await readFile(resolve('content/templates/catalog.demo.json'), 'utf8'))) store.importProduct(product);
+  const config = loadBusinessConfig();
+  const service = new CustomerService(store, { config,
+    router: { configured: true, decide: async () => ({ ...baseRoute(config, 'UI_TEST'), routeStatus: 'jev', intent: 'product_advice',
+      riskLevel: 'low', primarySkill: 'makeup-color-synesthesia-skill', action: 'clarify',
+      rawAnswers: { primary_skill: { choice: 'makeup-color-synesthesia-skill' } } }) },
+    generator: { configured: true, generate: async input => ({ answer: input.responseMode === 'clarify' ? '喜欢什么风格？' : '先看两款演示商品。',
+      sourceRefs: input.responseMode === 'answer' ? ['demo-lip-rose-source'] : [], model: 'browser-test', usage: {} }) },
+  });
+  service.skills.import({ filename: 'guide.json', content: JSON.stringify({ id: 'makeup-color-synesthesia-skill', version: 'ui-v1',
+    description: '口红导购', intents: ['product_advice'], knowledgeScopes: ['product'], requiredFields: [],
+    requiresKnowledge: true, recommendation: { category: '口红', maxClarifications: 1 }, instructions: '先给建议', knowledge: [] }) });
+  const server = createApp(store, service, { access: testAccess(store) }).listen(0, '127.0.0.1');
+  await new Promise<void>(r => server.once('listening', r));
+  const browser = await chromium.launch({ executablePath, headless: true, timeout: 20_000 });
+  try {
+    const page = await browser.newPage(); page.setDefaultTimeout(10_000);
+    await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/chat/`);
+    await page.locator('#service-status').getByText('欢迎咨询').waitFor();
+    await page.locator('#message').fill('想买自然的口红'); await page.locator('#send').click();
+    await page.getByText('喜欢什么风格？').waitFor();
+    await page.locator('#message').fill('唇色偏深，喜欢自然温柔'); await page.locator('#send').click();
+    await page.locator('.product-card').first().waitFor();
+    assert.equal(await page.locator('.product-card').count(), 2);
+    assert.match(await page.locator('.product-card').first().innerText(), /演示商品[\s\S]*资料依据/);
   } finally {
     await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
     store.close(); await rm(dir, { recursive: true, force: true });

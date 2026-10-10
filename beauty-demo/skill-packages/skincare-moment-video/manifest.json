@@ -1,0 +1,9 @@
+{
+  "id": "skincare-moment-video",
+  "version": "v1.0.0",
+  "description": "用户希望把已授权的护肤照片或GIF整理成约15秒纪念视频时，确认素材、时间范围和隐私授权，并调用已配置的视频生成能力",
+  "intents": ["product_advice", "emotional_support"],
+  "knowledgeScopes": ["product"],
+  "requiredFields": [],
+  "requiresKnowledge": false
+}

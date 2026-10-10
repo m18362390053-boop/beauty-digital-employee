@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = { userId: '', productId: '', sessionId: '', card: null, page: 'chat', pending: null, abort: null, csrf: '', expectedSkill: null };
+const state = { userId: '', productId: '', sessionId: '', card: null, page: 'chat', pending: null, abort: null, csrf: '', expectedSkill: null, lastResult: null };
 let refreshTimer;
 const labels = { AI_ACTIVE: 'AI服务', HANDOFF_PENDING: '等待人工', HUMAN_ACTIVE: '人工处理中', RESOLVED: '已结束' };
 const roleNames = { user: '用户', assistant: '客服', human: '人工坐席', system: '系统状态' };
@@ -10,6 +10,12 @@ function node(tag, text, className) { const e = document.createElement(tag); if 
 function action(text, fn) {
   const b = node('button', text); b.type = 'button';
   b.addEventListener('click', () => guarded(fn)); return b;
+}
+function downloadJson(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const link = document.createElement('a');
+  link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
+  URL.revokeObjectURL(url);
 }
 async function guarded(fn) { try { await fn(); } catch (error) { notify(error.message); } }
 async function api(path, method = 'GET', body, signal) {
@@ -86,9 +92,12 @@ async function loadChat() {
   if (messages.total > messages.items.length) box.prepend(node('p', '这里只展示前200条，完整记录可通过分页API读取。', 'small'));
 }
 function showResult(result) {
+  state.lastResult = result;
   $('route-result').textContent = JSON.stringify(result, null, 2);
+  $('download-route-json').disabled = false;
   const summary = $('run-summary'); summary.replaceChildren();
-  for (const [label, value] of [['结果', result.status], ['决策来源', result.route?.routeStatus ?? '未执行'], ['主Skill', result.generation?.skillId ?? result.route?.primarySkill ?? '无'],
+  for (const [label, value] of [['结果', result.status], ['决策来源', result.route?.routeStatus ?? '未执行'],
+    ['Jev原始选择', result.route?.rawAnswers?.primary_skill?.choice ?? '无'], ['实际Skill', result.generation?.skillId ?? '无'],
     ['版本', result.generation?.skillVersion ?? '—'], ['来源数', result.sourceRefs.length]]) summary.append(node('p', `${label}：${value}`, 'small'));
   if (state.expectedSkill) summary.append(node('p', result.generation?.skillId === state.expectedSkill ? '✓ 实际执行了目标Skill' : '本次未执行目标Skill，请查看风险/追问/兜底原因。'));
   summary.append(action('查看完整执行证据', async () => { await openPage('runs'); $('run-select').value = result.runId; await loadRunDetail(result.runId); }));
@@ -354,8 +363,23 @@ async function loadRunDetail(id) {
   follow.append(node('p', `人工状态：${data.handoff ? handoffNames[data.handoff.status] : '无人工工单'}`));
   for (const f of data.feedback) follow.append(node('p', `反馈 ${feedbackNames[f.type] ?? f.type} · ${f.updatedAt} · ${f.reason || '无附加原因'}`));
   for (const reply of data.humanReplies) follow.append(node('p', `人工：${reply.content}`)); box.append(follow);
-  const debug = node('details', undefined, 'panel'); debug.append(node('summary', '开发调试JSON'), node('pre', JSON.stringify(data, null, 2))); box.append(debug);
+  const debug = node('details', undefined, 'panel');
+  const debugSummary = node('summary', undefined, 'details-summary'); debugSummary.append(node('span', '开发调试JSON'));
+  const download = action('下载 JSON', event => {
+    event?.preventDefault?.(); event?.stopPropagation?.();
+    downloadJson(data, `beauty-run-${data.runId}.json`);
+    notify(`已下载执行记录 ${data.runId}.json`);
+  });
+  download.classList.add('compact');
+  download.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); });
+  debugSummary.append(download); debug.append(debugSummary, node('pre', JSON.stringify(data, null, 2))); box.append(debug);
 }
+$('download-route-json').addEventListener('click', event => {
+  event.preventDefault(); event.stopPropagation();
+  if (!state.lastResult) return;
+  downloadJson(state.lastResult, `beauty-route-${state.lastResult.runId}.json`);
+  notify(`已下载调试记录 ${state.lastResult.runId}.json`);
+});
 $('refresh-runs').addEventListener('click', () => guarded(loadRuns));
 $('load-run').addEventListener('click', () => guarded(() => loadRunDetail($('run-select').value)));
 $('operator-login-form').addEventListener('submit', event => {

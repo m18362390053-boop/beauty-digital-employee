@@ -127,6 +127,8 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 th { color: #5d3b76; background: #faf6fd; }
 summary { cursor: pointer; color: #5d3b76; }
+.details-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+button.compact { padding: 5px 10px; font-size: 12px; }
 footer { padding: 18px 24px 35px; color: var(--muted); font-size: 12px; }
 details p { white-space: pre-wrap; }
 .ticket-actions { margin-bottom: 12px; }
@@ -138,6 +140,10 @@ details p { white-space: pre-wrap; }
 .customer-shell { max-width: 960px; }
 .customer-messages { min-height: 300px; max-height: 58vh; overflow: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
 .source-label { display: inline-block; font-size: 12px; color: var(--muted); margin: 6px 8px 0 0; }
+.product-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 12px; }
+.product-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: #fff; }
+.product-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; margin-bottom: 8px; }
+.product-card p { margin: 4px 0; }
 #setup-warning { margin-top: 12px; }
 #setup-warning[hidden] { display: none; }
 a { color: var(--primary); }

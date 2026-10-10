@@ -82,6 +82,7 @@ export function parseSkillUpload(input: unknown): BusinessSkill {
     description: metadata.description, instructions, knowledge,
     intents: metadata.intents ?? ['product_advice'], knowledgeScopes: metadata.knowledgeScopes ?? ['product'],
     requiredFields: metadata.requiredFields ?? [], requiresKnowledge: metadata.requiresKnowledge ?? false,
+    recommendation: metadata.recommendation,
   });
   if (parsed.knowledge.reduce((sum, item) => sum + item.content.length, 0) > 120_000) throw new AppError(413, 'KNOWLEDGE_TOO_LARGE', '每个Skill知识正文总计最多120000字符。');
   return parsed;

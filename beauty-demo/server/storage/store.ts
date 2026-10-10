@@ -150,10 +150,10 @@ export class Store {
     const product = productSchema.parse(input);
     const digest = hash(product);
     return this.transaction(() => {
-      const existingProduct = this.db.prepare('SELECT id FROM products LIMIT 1').get() as { id: string } | undefined;
-      if (existingProduct && existingProduct.id !== product.productId) {
-        throw new AppError(409, 'SINGLE_PRODUCT_SCOPE', 'This demo uses one product. Use a separate database to switch products.');
-      }
+      const existingProduct = this.db.prepare('SELECT id FROM products WHERE id = ?').get(product.productId) as { id: string } | undefined;
+      const existingKind = this.db.prepare(`SELECT json_extract(pv.document, '$.dataKind') AS dataKind FROM products p JOIN product_versions pv
+        ON pv.product_id=p.id AND pv.version=p.current_version LIMIT 1`).get() as { dataKind: string } | undefined;
+      if (existingKind && existingKind.dataKind !== product.dataKind) throw new AppError(409, 'DATA_KIND_CONFLICT', 'Do not mix demo and business data in one database.');
       const previous = this.db.prepare('SELECT digest FROM product_versions WHERE product_id = ? AND version = ?')
         .get(product.productId, product.version) as { digest: string } | undefined;
       if (previous) {
@@ -175,11 +175,31 @@ export class Store {
 
   listProducts() {
     const rows = this.db.prepare(`SELECT pv.document FROM products p JOIN product_versions pv
-      ON pv.product_id = p.id AND pv.version = p.current_version`).all() as DocumentRow[];
+      ON pv.product_id = p.id AND pv.version = p.current_version ORDER BY p.rowid`).all() as DocumentRow[];
     return rows.map(row => {
       const product = JSON.parse(row.document) as ProductDocument;
-      return { productId: product.productId, name: product.name, version: product.version, dataKind: product.dataKind };
+      return { productId: product.productId, name: product.name, version: product.version, dataKind: product.dataKind,
+        recommendation: product.recommendation ?? null };
     });
+  }
+
+  recommendationProducts(dataKind: ProductDocument['dataKind']) {
+    return this.listProducts().filter(product => product.dataKind === dataKind && product.recommendation)
+      .map(product => this.getKnowledge(product.productId))
+      .filter(product => Boolean(product.recommendation?.sourceId && product.facts.some(fact => fact.sourceId === product.recommendation!.sourceId)));
+  }
+
+  priorClarifications(sessionId: string, skillId: string) {
+    const rows = this.db.prepare(`SELECT route_json AS route, result_json AS result FROM consultation_runs
+      WHERE session_id=? AND state='completed' ORDER BY created_at DESC LIMIT 6`).all(sessionId) as { route: string | null; result: string | null }[];
+    let count = 0;
+    for (const row of rows) {
+      const route = row.route ? JSON.parse(row.route) as { rawAnswers?: { primary_skill?: { choice?: string } }; primarySkill?: string | null } : null;
+      const result = row.result ? JSON.parse(row.result) as { status?: string } : null;
+      if (result?.status !== 'clarification_required' || (route?.rawAnswers?.primary_skill?.choice ?? route?.primarySkill) !== skillId) break;
+      count++;
+    }
+    return count;
   }
 
   getProduct(productId: string): ProductDocument {

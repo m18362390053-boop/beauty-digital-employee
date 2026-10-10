@@ -8,6 +8,7 @@ import type { BusinessConfig, ConsultResult, DecisionProvider, GenerationProvide
 import { SkillPackages } from './skill-packages.js';
 import { ModelSettings } from './model-settings.js';
 import { createHash } from 'node:crypto';
+import { recommendProducts } from './recommendations.js';
 
 export class CustomerService {
   readonly workflows: Workflows;
@@ -98,11 +99,11 @@ export class CustomerService {
     const result: ConsultResult = {
       runId: begun.runId, requestId: message.requestId, sessionId, status: 'degraded', answer: null, answerKind: 'none',
       messageId: null, sourceRefs: [], route: null, warnings: [], policyStatus: config.reviewStatus, dataKind: product.dataKind,
-      handoffId: handoff?.id ?? null, generation: null,
+      handoffId: handoff?.id ?? null, generation: null, productCards: [],
     };
     const saveRoute = (route: RouteRecord) => { result.route = { ...route }; this.workflows.saveRoute(begun.runId, route); };
     const finishTemplate = (status: ConsultResult['status'], answer: string, requireActive = true) => {
-      Object.assign(result, { status, answer, answerKind: 'template' });
+      Object.assign(result, { status, answer, answerKind: 'template', productCards: [] });
       return this.workflows.finish(userId, result, context.session.stateVersion, requireActive);
     };
     if (explicit) {
@@ -124,8 +125,13 @@ export class CustomerService {
       const decisionInput = { userText: message.content, card: context.card, selectedProduct: { id: product.productId, name: product.name },
         recentMessages: context.recentMessages.map(m => ({ role: m.role, content: m.content })) };
       this.workflows.event(begun.runId, 'routing', '开始调度检查', { 模型已配置: router.configured, 可用Skill数: config.skills.length });
-      const route = await router.decide(decisionInput, config, signal);
+      let route = await router.decide(decisionInput, config, signal);
       signal.throwIfAborted();
+      const selectedSkill = config.skills.find(skill => skill.id === route.primarySkill);
+      if (route.action === 'clarify' && route.riskLevel === 'low' && selectedSkill?.recommendation
+        && this.store.priorClarifications(sessionId, selectedSkill.id) >= selectedSkill.recommendation.maxClarifications) {
+        route = { ...route, action: 'answer', reasonCodes: [...route.reasonCodes, 'CLARIFICATION_LIMIT_REACHED'] };
+      }
       saveRoute(route);
       if (route.action === 'handoff' || route.riskLevel === 'high' || route.needsHumanHandoff) {
         handoff = this.workflows.requestHandoff(userId, sessionId, route.reasonCodes.join(','), begun.runId);
@@ -134,9 +140,9 @@ export class CustomerService {
       }
       let responseMode: 'answer' | 'clarify' | 'conversation' = route.action === 'answer' ? 'answer' : route.intent ? 'clarify' : 'conversation';
       const conversationalSkill = { id: 'service-conversation', version: 'v1', description: '服务引导与针对性追问',
-        knowledgeScopes: [] as ('product' | 'after_sales' | 'comment_insights')[], requiredFields: [], intents: [], requiresKnowledge: false, knowledge: [],
+        knowledgeScopes: [] as ('product' | 'after_sales' | 'comment_insights')[], requiredFields: [], intents: [], requiresKnowledge: false, knowledge: [], recommendation: undefined,
         instructions: `根据用户这句话自然回应。寒暄时欢迎并说明可用服务；问题不明确时只问最相关的一两个问题，不机械要求肤质和使用时间。\n可用服务：${config.skills.map(s => s.description).join('；')}。\n当前风险：${route.riskLevel ?? '未判定'}。如在澄清风险，不推荐商品。` };
-      const skill = responseMode === 'answer' ? config.skills.find(s => s.id === route.primarySkill) : conversationalSkill;
+      const skill = route.primarySkill ? config.skills.find(s => s.id === route.primarySkill) : conversationalSkill;
       if (!skill) throw new ProviderError('UNKNOWN_SKILL');
       const facts = product.facts.filter(fact => fact.category === 'after_sales' ? skill.knowledgeScopes.includes('after_sales') : skill.knowledgeScopes.includes('product'));
       const usedSources = new Set(facts.map(fact => fact.sourceId));
@@ -146,6 +152,18 @@ export class CustomerService {
         knowledge.sources.push({ sourceId, title: document.title, locator: `skill://${skill.id}/${skill.version}/${i}`, collectedAt: new Date().toISOString() });
         knowledge.facts.push({ factId: `${sourceId}-fact`, category: 'description', text: document.content, sourceId, reviewStatus: 'approved' });
       }
+      if (skill.recommendation && responseMode === 'answer') {
+        const conversation = [...decisionInput.recentMessages.map(item => item.content), message.content,
+          ...context.card.preferences, ...context.card.concerns].join(' ');
+        result.productCards = recommendProducts(this.store.recommendationProducts(product.dataKind), skill.recommendation.category, conversation);
+        for (const card of result.productCards) {
+          const candidate = this.store.getKnowledge(card.productId);
+          for (const source of candidate.sources) if (!knowledge.sources.some(item => item.sourceId === source.sourceId)) knowledge.sources.push(source);
+          for (const fact of candidate.facts) if (!knowledge.facts.some(item => item.factId === fact.factId)) knowledge.facts.push(fact);
+        }
+        this.workflows.event(begun.runId, 'recommendation', '筛选已审核商品卡', { 分类: skill.recommendation.category,
+          数量: result.productCards.length, 商品: result.productCards.map(card => card.productId) });
+      }
       if (!knowledge.facts.length && skill.requiresKnowledge) {
         result.warnings.push('INSUFFICIENT_EVIDENCE');
         responseMode = 'clarify';
@@ -154,7 +172,7 @@ export class CustomerService {
       this.workflows.captureSkill(begun.runId, skill, knowledge);
       this.workflows.event(begun.runId, 'generation', '开始组织回复', { 回复模式: responseMode, 模型已配置: generator.configured, 评论条数: comments.length });
       providerStage = 'chat';
-      const generated = await generator.generate({ ...decisionInput, skill, knowledge, comments, responseMode }, signal);
+      const generated = await generator.generate({ ...decisionInput, skill, knowledge, comments, productCards: result.productCards, responseMode }, signal);
       signal.throwIfAborted();
       result.answer = generated.answer;
       result.answerKind = 'generated'; result.status = responseMode === 'clarify' ? 'clarification_required' : 'answered'; result.sourceRefs = generated.sourceRefs;

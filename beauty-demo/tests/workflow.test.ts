@@ -66,9 +66,16 @@ test('Jev adapter batches fixed questions and handles high-risk even with low cl
   assert.equal(route.action, 'handoff'); assert.equal(route.primarySkill, null); assert.equal(route.model, 'jev-test');
   response.answers.risk = answer('low'); response.answers.primary_skill = answer('other');
   assert.equal((await provider.decide(input, config, new AbortController().signal)).action, 'clarify');
+  response.answers.primary_skill = { type: 'choice', choice: 'product_consult', confidence: 0.59,
+    probabilities: { product_consult: 0.66, after_sales: 0.34 } };
+  response.answers.information_sufficient = { type: 'noul', noul: 0.5 };
+  const clarification = await provider.decide(input, config, new AbortController().signal);
+  assert.equal(clarification.action, 'clarify');
+  assert.equal(clarification.primarySkill, 'product_consult');
+  assert.deepEqual(clarification.reasonCodes, ['MISSING_USER_INFORMATION']);
   response.answers.primary_skill = answer('injected-skill');
   await assert.rejects(provider.decide(input, config, new AbortController().signal), /JEV_UNKNOWN_OPTION/);
-  assert.equal(calls, 3);
+  assert.equal(calls, 4);
 });
 
 test('generation adapter rejects invented or absent citations and truncated results', async t => {
@@ -96,6 +103,37 @@ test('consult executes once, persists route/source metadata, and replays identic
   assert.equal(store.listMessages('user-a', sessionId, 100, 0).total, 2);
   assert.deepEqual(store.listMessages('user-a', sessionId, 100, 0).items[1]!.metadata.sourceRefs, ['demo-manual']);
   await assert.rejects(service.consult('user-a', sessionId, { ...input, content: 'Different' }), error => error instanceof AppError && error.code === 'REQUEST_CONFLICT');
+});
+
+test('recommended skill handles one clarification then returns sourced product cards', async t => {
+  const router: DecisionProvider = { configured: true, decide: async (_input, cfg) => ({ ...baseRoute(cfg, 'TEST_ROUTE'),
+    routeStatus: 'jev', intent: 'product_advice', riskLevel: 'low', primarySkill: 'makeup-color-synesthesia-skill',
+    action: 'clarify', reasonCodes: ['MISSING_USER_INFORMATION'], model: 'test-jev',
+    rawAnswers: { primary_skill: { choice: 'makeup-color-synesthesia-skill' } } }) };
+  const generator: GenerationProvider = { configured: true, generate: async input => ({
+    answer: input.responseMode === 'clarify' ? '您平时喜欢哪种风格？' : '先看这两款演示商品。',
+    sourceRefs: input.responseMode === 'answer' ? ['demo-lip-rose-source'] : [], model: 'test-chat', usage: {},
+  }) };
+  const { store, service, sessionId } = await fixture(t, router, generator);
+  for (const product of await load('catalog.demo.json')) store.importProduct(product);
+  service.skills.import({ filename: 'guide.json', content: JSON.stringify({ id: 'makeup-color-synesthesia-skill',
+    version: 'test-v1', description: '口红导购', intents: ['product_advice'], knowledgeScopes: ['product'], requiredFields: [],
+    requiresKnowledge: true, recommendation: { category: '口红', maxClarifications: 1 }, instructions: '先给建议', knowledge: [] }) });
+  const first = await service.consult('user-a', sessionId, { requestId: 'lip-first', content: '想买自然的口红' });
+  assert.equal(first.status, 'clarification_required');
+  assert.equal(first.generation?.skillId, 'makeup-color-synesthesia-skill');
+  assert.deepEqual(first.productCards, []);
+  const selectedProduct = await load('product.demo.json');
+  selectedProduct.version = 'demo-v2';
+  selectedProduct.facts.forEach((fact: { reviewStatus: string }) => { fact.reviewStatus = 'draft'; });
+  store.importProduct(selectedProduct);
+  const second = await service.consult('user-a', sessionId, { requestId: 'lip-second', content: '唇色偏深，喜欢温柔自然' });
+  assert.equal(second.status, 'answered');
+  assert.equal(second.route?.action, 'answer');
+  assert.equal(second.generation?.skillId, 'makeup-color-synesthesia-skill');
+  assert.equal(second.productCards.length, 2);
+  assert.ok(second.productCards.every(card => card.dataKind === 'demo' && card.sourceId));
+  assert.deepEqual(store.listMessages('user-a', sessionId, 10, 0).items.at(-1)?.metadata.productCards, second.productCards);
 });
 
 test('missing credentials produce explicit persisted degraded result, never a fake Jev answer', async t => {

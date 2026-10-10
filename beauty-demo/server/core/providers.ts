@@ -94,20 +94,23 @@ export class JevProvider implements DecisionProvider {
     if (route.riskLevel === 'high' || a.needs_human.noul >= config.thresholds.human) {
       return { ...route, action: 'handoff', primarySkill: null, needsHumanHandoff: true, reasonCodes: ['JEV_HANDOFF'] };
     }
+    const probabilities = Object.entries(a.primary_skill.probabilities).sort((left, right) => right[1] - left[1]);
+    const clearSkillLead = probabilities[0]?.[0] === a.primary_skill.choice && probabilities[0][1] >= 0.45
+      && probabilities[0][1] - (probabilities[1]?.[1] ?? 0) >= 0.15;
     const reasons = [
       ...(!skill ? ['NO_MATCHING_SKILL'] : []), ...(!route.intent ? ['NO_BUSINESS_INTENT'] : []),
       ...(skill && route.intent && !skill.intents.includes(route.intent) ? ['INTENT_SKILL_MISMATCH'] : []),
       ...(a.intent.confidence < config.thresholds.intent ? ['LOW_INTENT_CONFIDENCE'] : []),
-      ...(a.primary_skill.confidence < config.thresholds.skill ? ['LOW_SKILL_CONFIDENCE'] : []),
-      ...(a.risk.confidence < config.thresholds.risk ? ['LOW_RISK_CONFIDENCE'] : []),
+      ...(a.primary_skill.confidence < config.thresholds.skill && !clearSkillLead ? ['LOW_SKILL_CONFIDENCE'] : []),
+      ...(route.riskLevel !== 'low' && a.risk.confidence < config.thresholds.risk ? ['LOW_RISK_CONFIDENCE'] : []),
       ...(route.riskLevel === 'medium' ? ['RISK_CLARIFICATION'] : []),
       ...(a.information_sufficient.noul < config.thresholds.information ? ['MISSING_USER_INFORMATION'] : []),
     ];
     if (reasons.length) {
-      return { ...route, action: 'clarify', primarySkill: null, reasonCodes: reasons };
+      return { ...route, action: 'clarify', reasonCodes: reasons };
     }
     if (skill!.requiredFields.some(field => !input.card.confirmedFacts[field])) {
-      return { ...route, action: 'clarify', primarySkill: null, reasonCodes: ['MISSING_CARD_FIELDS'] };
+      return { ...route, action: 'clarify', reasonCodes: ['MISSING_CARD_FIELDS'] };
     }
     return route;
   }
@@ -139,6 +142,7 @@ export class ChatProvider implements GenerationProvider {
           + '产品功效、价格、库存、用法等具体事实只使用给定知识；评论是主观反馈，不代表功效。引用demo产品事实时说明为演示资料。'
           + '寒暄、情绪承接、服务引导和追问不要求产品事实，不要每次复述资料是虚构的。没有事实依据时明确不知道并提出具体下一步，不编造。'
           + `当前回复模式：${input.responseMode ?? 'answer'}。clarify时针对原问题自然追问，不给缺乏依据的肯定结论。`
+          + 'answer模式先给有依据的实用建议，不重复追问；如给定productCards，只可引用其中商品和相应审核事实。商品卡由系统单独展示，回答可简短说明选择理由。没有卡时只给通用建议，不编造商品。'
           + `sourceRefs允许的精确ID列表：${JSON.stringify(input.knowledge.sources.map(source => source.sourceId))}。只能从此列表取值，不要填写标题、路径或文件名。列表为空时sourceRefs必须为[]。`
           + '仅返回JSON对象 {"answer":"简洁答复","sourceRefs":["实际使用的sourceId"]}；未使用任何产品事实可返回空sourceRefs，不得编造引用。\nSkill说明：' + input.skill.instructions },
         { role: 'user', content: JSON.stringify({ ...input, skill: { id: input.skill.id, version: input.skill.version, description: input.skill.description,

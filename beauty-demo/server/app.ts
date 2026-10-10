@@ -68,11 +68,12 @@ export function createApp(store: Store, service = new CustomerService(store), op
   });
   app.get('/api/status', (_req, res) => res.json(service.status()));
   app.post('/api/setup/demo', (_req, res) => {
-    if (store.listProducts().some(p => p.productId !== 'demo-product' || p.dataKind !== 'demo')) {
+    if (store.listProducts().some(p => p.dataKind !== 'demo')) {
       throw new AppError(409, 'BUSINESS_DATA_PRESENT', '已有业务产品，不能导入演示产品覆盖。');
     }
     const load = (name: string) => JSON.parse(readFileSync(resolve('content/templates', name), 'utf8'));
     store.importProduct(load('product.demo.json'));
+    for (const product of load('catalog.demo.json')) store.importProduct(product);
     store.importComments(load('comments.demo.json'));
     const users = store.listUsers();
     for (const userId of ['demo-user-a', 'demo-user-b']) if (!users.some(user => user.userId === userId)) store.createUser({ userId, displayName: `演示用户 ${userId.slice(-1).toUpperCase()}` });

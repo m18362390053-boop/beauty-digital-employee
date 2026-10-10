@@ -10,7 +10,8 @@ const friendlyFailure = '当前智能客服暂时无法完成回复。您的消�
 export function publicResult(result: ConsultResult | null, service?: CustomerService) {
   if (!result) return null;
   return { requestId: result.requestId, sessionId: result.sessionId, messageId: result.messageId, status: result.status,
-    answer: result.status === 'degraded' ? friendlyFailure : result.answer, sources: service?.workflows.publicSources(result.runId, result.sourceRefs) ?? [], dataKind: result.dataKind,
+    answer: result.status === 'degraded' ? friendlyFailure : result.answer, sources: service?.workflows.publicSources(result.runId, result.sourceRefs) ?? [],
+    productCards: result.status === 'answered' ? result.productCards ?? [] : [], dataKind: result.dataKind,
     message: ({ answered: '已完成回复', clarification_required: '需要补充信息', degraded: '智能服务暂不可用', handoff_pending: '正在等待人工', human_active: '人工已接入', resolved: '本次服务已结束', cancelled: '已停止处理', interrupted: '处理已中止' })[result.status] };
 }
 export function mountCustomerApi(app: Express, store: Store, service: CustomerService, access: AccessControl) {
@@ -34,10 +35,12 @@ export function mountCustomerApi(app: Express, store: Store, service: CustomerSe
     const session = store.getSession(res.locals.customerUserId, id);
     const messages = store.listMessages(res.locals.customerUserId, id, pagination.limit, pagination.offset);
     res.json({ session: { sessionId: session.sessionId, status: session.status }, ...messages, items: messages.items.map(message => {
-      const metadata = message.metadata as { runId?: string; warnings?: string[]; status?: string; sourceRefs?: string[]; dataKind?: string };
+      const metadata = message.metadata as { runId?: string; warnings?: string[]; status?: string; sourceRefs?: string[];
+        productCards?: ConsultResult['productCards']; dataKind?: string };
       const failed = metadata.status === 'degraded' || metadata.warnings?.some(code => code !== 'INSUFFICIENT_EVIDENCE');
       return { messageId: message.messageId, role: message.role, content: message.role === 'assistant' && failed ? friendlyFailure : message.content,
-        createdAt: message.createdAt, sources: metadata.runId ? service.workflows.publicSources(metadata.runId, metadata.sourceRefs ?? []) : [], dataKind: metadata.dataKind };
+        createdAt: message.createdAt, sources: metadata.runId ? service.workflows.publicSources(metadata.runId, metadata.sourceRefs ?? []) : [],
+        productCards: failed ? [] : metadata.productCards ?? [], dataKind: metadata.dataKind };
     }) });
   });
   app.post('/api/customer/sessions/:sessionId/consult', async (req, res) => {

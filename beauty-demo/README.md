@@ -1,6 +1,6 @@
 # 美妆客服 Demo · Harness + 独立业务后端
 
-单产品美妆客服比赛Demo。现已拆分用户客服端与运营端，提供权限校验、可读执行记录、Skill版本预览/导出/回滚。业务内容仍是明确标注的演示样例。
+美妆客服比赛Demo。现已拆分用户客服端与运营端，提供权限校验、可读执行记录、Skill版本预览/导出/回滚，以及有来源的多商品推荐卡。业务内容仍是明确标注的演示样例。
 
 ```text
 DeepSeek Harness → MCP工具 ─┐
@@ -18,6 +18,7 @@ DeepSeek Harness → MCP工具 ─┐
 - 用户卡、版本检查、跨会话记忆、会话消息和咨询请求幂等性。
 - 默认3个Skill，可上传扩展；4类意图、情绪、3级风险；Jev API适配与原始路由记录。
 - 审核资料按Skill范围筛选、OpenAI兼容回复接口、引用ID校验、明确的失败降级。
+- Jev路由保留已匹配Skill；导购Skill可声明商品类别和最多追问轮数。商品卡只从已审核商品资料生成，并在用户端显示来源。
 - 风险规则优先、AI暂停、待人工/人工中/已结束状态、来源消息摘要、真实本地坐席回复。
 - “有帮助/没解决/转人工”反馈，可替换不重复计数；评论与服务数据分区的追溯看板。
 - 用户端只显示自己的聊天/资料/反馈；运营端提供模型/Skill/坐席/看板/测试和执行记录。另有10个Harness MCP工具。
@@ -26,7 +27,7 @@ DeepSeek Harness → MCP工具 ─┐
 ## 当前边界
 
 - `config/business.demo.json` 是**开发用暂定配置**，不是业务B审核完成的内容；阈值未用真实金标校准。
-- 当前样例为1个虚构产品、3条虚构评论；业务需交付真实资料、至少200条匿名评论和50条Case。
+- 当前样例为1个基础虚构产品、2个虚构演示口红和3条虚构评论；商品卡只用于验证流程，业务需交付真实商品、审核资料、至少200条匿名评论和50条Case。
 - **已完成真实模型端到端冒烟联调**：Jev `jev-1.13.0` → `product_consult` → DeepSeek `deepseek-flash`，返回有来源的生成回答；约1.7秒。单条演示请求不代表业务准确率验收。
 - 未配置密钥时，普通问题明确返回 `degraded` 模板；明确风险和人工请求仍能走真实本地接管流程。
 - 人工摘要用来源消息模板，不自动推断症状起始时间；坐席需查看原话核实。
@@ -42,6 +43,8 @@ npm ci
 npm run build
 # 仅初始化虚构演示库；已导入过可重复执行
 npm run seed:demo
+# 将新版导购Skill和两件演示口红同步到已有演示数据库
+npm run sync:recommendation-demo
 npm start
 ```
 
@@ -79,6 +82,7 @@ npm start
 Jev负责结构化判断，回复模型负责生成答案，二者各自计费。仅对明确发生在建立连接前的DNS/连接错误重试一次；不自动重试HTTP拒绝、用户取消或可能已计费的断连。
 策略文件用 `BUSINESS_CONFIG` 指定；本地运行配置用 `BEAUTY_LOCAL_CONFIG` 指定，默认可选加载 `config/local.json`。改配置后需重启。
 产品知识仍只读取approved条目。策略reviewStatus用于标识版本状态，不再阻塞全部business资料。演示策略为demo-policy-v3，上传Skill后版本附加内容指纹，阈值未降低。
+推荐商品在产品JSON中使用可选的 `recommendation` 字段，包含 `category`、`shade`、`texture`、`keywords`、指向已审核事实的 `sourceId`，以及可选的HTTPS `imageUrl`、`price`。导购Skill的 `manifest.json` 可声明 `recommendation: {"category":"口红","maxClarifications":1}`。仅导入该Skill不会自动生成商品卡，还需导入带已审核事实的商品资料；业务商品与演示商品不能混在同一数据库。`npm run check:recommendation-live` 可用独立验收用户进行一次实际模型联调。
 单次咨询整体上限45秒（Jev15秒、回复25秒）；取消会传播，并在人工接管后阻止迟到回答。
 
 ## 在Harness中调用
