@@ -19,6 +19,7 @@ DeepSeek Harness → MCP工具 ─┐
 - 默认3个Skill，可上传扩展；4类意图、情绪、3级风险；Jev API适配与原始路由记录。
 - 审核资料按Skill范围筛选、OpenAI兼容回复接口、引用ID校验、明确的失败降级。
 - Jev路由保留已匹配Skill；导购Skill可声明商品类别和最多追问轮数。商品卡只从已审核商品资料生成，并在用户端显示来源。
+- 用户提供的《欧莱雅40岁以上女性护肤知识库》作为带日期的参考快照纳入 `product_consult` 知识上下文，并同步放在熟龄美妆Skill参考目录中；价格、SKU和具体用法仍须核对当期官方页及实物包装，不能跨SKU/品牌类推。详见 [本次变更记录](docs/项目目录与本次变更.md)。
 - 风险规则优先、AI暂停、待人工/人工中/已结束状态、来源消息摘要、真实本地坐席回复。
 - “有帮助/没解决/转人工”反馈，可替换不重复计数；评论与服务数据分区的追溯看板。
 - 用户端只显示自己的聊天/资料/反馈；运营端提供模型/Skill/坐席/看板/测试和执行记录。另有10个Harness MCP工具。
@@ -80,8 +81,8 @@ npm start
 
 `CHAT_BASE_URL` 也可以使用其他实际支持OpenAI Chat Completions的服务；具体模型名按账号可用列表填写。
 Jev负责结构化判断，回复模型负责生成答案，二者各自计费。仅对明确发生在建立连接前的DNS/连接错误重试一次；不自动重试HTTP拒绝、用户取消或可能已计费的断连。
-策略文件用 `BUSINESS_CONFIG` 指定；本地运行配置用 `BEAUTY_LOCAL_CONFIG` 指定，默认可选加载 `config/local.json`。改配置后需重启。
-产品知识仍只读取approved条目。策略reviewStatus用于标识版本状态，不再阻塞全部business资料。演示策略为demo-policy-v3，上传Skill后版本附加内容指纹，阈值未降低。
+策略文件用 `BUSINESS_CONFIG` 指定；本地运行配置用 `BEAUTY_LOCAL_CONFIG` 指定，默认可选加载 `config/local.json`。改配置后需重启。欧莱雅参考文档由 `server/core/registry.ts` 加载至 `product_consult`，不会依赖 Jev 选择熟龄美妆Skill才能进入客服知识上下文。
+产品知识仍只读取approved条目。策略reviewStatus用于标识版本状态，不再阻塞全部business资料。演示策略现为demo-policy-v4，上传Skill后版本附加内容指纹，阈值未降低。
 推荐商品在产品JSON中使用可选的 `recommendation` 字段，包含 `category`、`shade`、`texture`、`keywords`、指向已审核事实的 `sourceId`，以及可选的HTTPS `imageUrl`、`price`。导购Skill的 `manifest.json` 可声明 `recommendation: {"category":"口红","maxClarifications":1}`。仅导入该Skill不会自动生成商品卡，还需导入带已审核事实的商品资料；业务商品与演示商品不能混在同一数据库。`npm run check:recommendation-live` 可用独立验收用户进行一次实际模型联调。
 面部区域图解原型位于 `skill-packages/face-area-visual-guide/`。在 `beauty-demo` 目录运行 `npm run sync:face-guide-demo` 会把ZIP生成到 `skill-packages/dist/` 并导入当前本地数据库；也可在运营端上传该ZIP。此能力作为附加图示，不依赖 Jev 将其选为唯一主Skill：用户问题或客服答复提及受支持面部位置时，用户端展示原创正面人像SVG动态高亮图，支持暂停与系统“减少动态效果”。问答涉及过敏/刺激时，图示只用于辨认位置，并明确提示不能据此继续涂抹。图示不使用自拍，不作个人肤质诊断、产品许可判断或医学按摩指导。小红书调研的未验证部分见 `docs/face-area-visual-research.md`。
 单次咨询整体上限45秒（Jev15秒、回复25秒）；取消会传播，并在人工接管后阻止迟到回答。

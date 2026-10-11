@@ -3,7 +3,13 @@ import { resolve } from 'node:path';
 import { businessConfigSchema, type BusinessConfig, type RouteRecord } from './workflow-types.js';
 
 export function loadBusinessConfig(path = process.env.BUSINESS_CONFIG ?? './config/business.demo.json'): BusinessConfig {
-  return businessConfigSchema.parse(JSON.parse(readFileSync(resolve(path), 'utf8')));
+  const config = businessConfigSchema.parse(JSON.parse(readFileSync(resolve(path), 'utf8')));
+  const productConsult = config.skills.find(skill => skill.id === 'product_consult');
+  if (productConsult && !productConsult.knowledge.some(item => item.title === '欧莱雅40岁以上女性护肤知识库（用户整理快照）')) {
+    const content = readFileSync(resolve('skill-packages/makeup-color-synesthesia-skill/references/loreal-40plus-skincare-knowledge.md'), 'utf8').trim();
+    productConsult.knowledge.push({ title: '欧莱雅40岁以上女性护肤知识库（用户整理快照）', content });
+  }
+  return businessConfigSchema.parse(config);
 }
 export function baseRoute(config: BusinessConfig, reason: string): RouteRecord {
   return {

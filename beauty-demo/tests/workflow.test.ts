@@ -132,6 +132,23 @@ async function fixture(t: TestContext, router = fakeRouter, generator = fakeGene
   return { store, service, sessionId: session.sessionId, dir };
 }
 
+test('dated L’Oreal reference is attached to normal product-consult knowledge with provenance', async t => {
+  let captured: Parameters<GenerationProvider['generate']>[0] | undefined;
+  const generator: GenerationProvider = { configured: true, generate: async input => {
+    captured = input;
+    const reference = input.knowledge.facts.find(fact => fact.text.includes('客服使用边界：这是用户整理并提供的参考快照'));
+    return { answer: '请以当期官方页面和包装复核。', sourceRefs: reference ? [reference.sourceId] : [], model: 'test-generator', usage: {} };
+  } };
+  const { service, sessionId } = await fixture(t, fakeRouter, generator);
+  const result = await service.consult('user-a', sessionId, { requestId: 'loreal-knowledge', content: '欧莱雅护肤品怎么选？' });
+  assert.ok(captured);
+  const reference = captured.knowledge.facts.find(fact => fact.text.includes('客服使用边界：这是用户整理并提供的参考快照'));
+  assert.ok(reference);
+  assert.ok(captured.knowledge.sources.some(source => source.sourceId === reference.sourceId && source.title.includes('欧莱雅40岁以上')));
+  assert.deepEqual(result.sourceRefs, [reference.sourceId]);
+  assert.match(reference.text, /本次代码整合没有逐条重新核验/);
+});
+
 test('business registry validates all skills and intent references; demo rules preserve explicit negation', () => {
   assert.equal(config.skills.length, 3);
   assert.equal(Object.keys(config.intents).length, 4);
