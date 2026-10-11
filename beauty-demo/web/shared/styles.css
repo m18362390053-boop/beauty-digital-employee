@@ -98,6 +98,9 @@ select { min-width: 170px; max-width: 100%; margin-bottom: 0; }
 textarea { resize: vertical; }
 textarea::placeholder { color: #8c7a96; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.form-feedback { align-self: center; color: var(--muted); font-size: 14px; }
+.form-feedback.success { color: #246a46; }
+.form-feedback.error { color: #a43838; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 pre {
@@ -118,6 +121,34 @@ pre {
 .message.human { border-left: 4px solid #9671b2; background: #f5effa; }
 .message.system { background: #f5ebdd; color: #66503a; }
 .message .meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.face-guide { margin-top: 14px; padding: 18px; border: 1px solid #decce7; border-radius: 16px; background: #fff; white-space: normal; width: min(100%, 520px); }
+.face-guide h3 { margin: 0 0 10px; color: #4d315f; font-size: 19px; }
+.face-figure { margin: 0 0 12px; padding: 8px; border: 1px solid #e8deec; border-radius: 14px; background: linear-gradient(#fffdfb, #fcf7f2); text-align: center; }
+.face-figure svg { display: block; width: min(100%, 340px); height: auto; margin: auto; }
+.face-figure figcaption, .face-figure-note { color: #62576a; font-size: 14px; line-height: 1.5; }
+.face-figure-note { margin-top: 4px; }
+.portrait-shoulders { fill: #dec4ce; stroke: #5c414c; stroke-width: 2; }
+.portrait-neck, .portrait-ear, .portrait-face { fill: #fff3e8; stroke: #684e53; stroke-width: 2.1; }
+.portrait-hair, .portrait-hair-front { fill: #4b363b; stroke: #4b363b; stroke-width: 2; }
+.portrait-brows { fill: none; stroke: #4b363b; stroke-width: 5; stroke-linecap: round; }
+.portrait-eye-line { fill: none; stroke: #3b2b32; stroke-width: 4; stroke-linecap: round; }
+.portrait-lashes { fill: none; stroke: #3b2b32; stroke-width: 2.2; stroke-linecap: round; }
+.portrait-nose, .portrait-mouth-line { fill: none; stroke: #715158; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.portrait-nostril { fill: none; stroke: #715158; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.portrait-lips { fill: #cf8994; stroke: #8d5664; stroke-width: 1.5; }
+.face-highlight { fill: #eeb265; stroke: #ad6638; stroke-width: 1.4; opacity: .7; animation: face-pulse 2s ease-in-out infinite; }
+.face-guide[data-region="t_zone"] .face-highlight { fill: #a8d6e7; stroke: #4b8299; }
+.face-guide[data-region="full_face"] .face-highlight { fill: #e6c6e8; stroke: #986ca2; opacity: .42; }
+.face-guide[data-region="nasolabial_fold"] .face-highlight { fill: none; stroke: #e7a06a; stroke-width: 10; stroke-linecap: round; }
+.face-guide[data-region="flaky_area"] .face-highlight { fill: #efbdad; stroke: #ba7971; stroke-dasharray: 4 3; }
+.face-guide[data-region="cheek"] .face-highlight { fill: #efb3bb; stroke: #b97181; }
+.face-application-boundary { fill: none; stroke: #6486a7; stroke-width: 2.5; stroke-dasharray: 5 4; stroke-linecap: round; }
+.face-guide-details { display: grid; gap: 8px; margin: 12px 0; }
+.face-guide-details p { display: grid; grid-template-columns: 70px 1fr; gap: 8px; margin: 0; font-size: 15px; line-height: 1.6; }
+.face-guide-details strong { color: #593c6b; }
+.face-guide.paused .face-highlight { animation: none; }
+@keyframes face-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .face-highlight { animation: none; } }
 .message .actions button { font-size: 12px; padding: 4px 8px; }
 #notification { padding: 0 24px; min-height: 24px; color: #805126; font-size: 13px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }

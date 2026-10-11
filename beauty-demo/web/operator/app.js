@@ -278,7 +278,14 @@ $('check-models').addEventListener('click', () => guarded(async () => {
   const button = $('check-models'); button.disabled = true; $('model-check-result').textContent = '正在真实验证，最多45秒…';
   try {
     const result = await api('/api/settings/models/check', 'POST', {});
-    $('model-check-result').textContent = `Jev：${result.jev.ok ? '成功' : '失败'} ${result.jev.message}\n回复模型：${result.chat.ok ? '成功' : '失败'} ${result.chat.message}`;
+    const explain = item => {
+      if (item.ok) return `成功 ${item.message}`;
+      if (/HTTP_402/.test(item.message)) return `失败：可能余额或额度不足。请到服务商后台确认，并在上方换用有额度的 API Key 后保存、重新验证。`;
+      if (/HTTP_429/.test(item.message)) return `失败：请求过快或额度不足。请稍后重试；若持续出现，请确认服务商余额并在上方更换 API Key。`;
+      if (/HTTP_401|HTTP_403/.test(item.message)) return `失败：API Key 被拒绝。请在上方更换正确的 Key 后保存、重新验证。`;
+      return `失败 ${item.message}`;
+    };
+    $('model-check-result').textContent = `Jev：${explain(result.jev)}\n回复模型：${explain(result.chat)}`;
   } finally { button.disabled = false; }
 }));
 $('skill-upload-form').addEventListener('submit', event => {

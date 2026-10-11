@@ -17,10 +17,10 @@
   "thresholds": { "intent": 0.65, "skill": 0.65, "risk": 0.65, "human": 0.75, "information": 0.6 },
   "skills": [
     {
-      "id": "product_consult", "version": "demo-v1", "description": "单产品知识与日常使用咨询",
+      "id": "product_consult", "version": "demo-v2", "description": "单产品知识、通俗护肤解释与日常使用咨询；询问面部涂抹位置时附加区域图示",
       "knowledgeScopes": ["product", "comment_insights"], "requiredFields": [],
       "intents": ["product_advice", "safety"],
-      "instructions": "演示配置：仅依据给定的审核资料答复。评论只能作为主观体验，不能当成功效证据。缺资料先问清，不诊断或承诺效果。"
+      "instructions": "演示配置：仅依据给定的审核资料回答具体产品事实；评论只能作为主观体验，不能当成功效证据。面向不熟悉护肤术语的用户，用日常参照物解释部位、步骤和注意点。用户问产品或护肤品涂在脸上哪里（如眼霜/眼周/卧蚕、T区、法令纹、鼻翼起皮）时，系统会在文字答复旁自动附上对应面部区域图，无须另选图示Skill；仅询问成分、价格等与部位无关的普通商品问题时不附图。区分部位位置与产品标签允许使用的范围；缺乏品牌标签依据时明确说明未知，不把通用建议说成该品牌说明，不诊断、不承诺按摩或产品功效。出现疼痛、红肿、破损、感染、视力异常等风险时按风险流程处理，不显示普通护肤图示。"
     },
     {
       "id": "after_sales", "version": "demo-v1", "description": "售后规则解释与诉求收集",

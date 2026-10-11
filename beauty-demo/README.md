@@ -29,7 +29,7 @@ DeepSeek Harness → MCP工具 ─┐
 - `config/business.demo.json` 是**开发用暂定配置**，不是业务B审核完成的内容；阈值未用真实金标校准。
 - 当前样例为1个基础虚构产品、2个虚构演示口红和3条虚构评论；商品卡只用于验证流程，业务需交付真实商品、审核资料、至少200条匿名评论和50条Case。
 - **已完成真实模型端到端冒烟联调**：Jev `jev-1.13.0` → `product_consult` → DeepSeek `deepseek-flash`，返回有来源的生成回答；约1.7秒。单条演示请求不代表业务准确率验收。
-- 未配置密钥时，普通问题明确返回 `degraded` 模板；明确风险和人工请求仍能走真实本地接管流程。
+- 未配置模型密钥或回复模型不可用时，普通问题明确返回 `degraded` 模板；若仅 Jev 遇到连接超时/断连，则使用保守本地路由继续调用已配置的回复模型，并在运行记录中保留降级标记。明确风险和人工请求仍能走本地接管流程。
 - 人工摘要用来源消息模板，不自动推断症状起始时间；坐席需查看原话核实。
 - 当前评论用于限量证据上下文和确定性标签统计；独立洞察JSON导入、CSV、完整文本检索尚待后续。
 - 已实现匿名浏览器身份、运营登录、CSRF与用户归属校验；不是完整的多坐席账号平台。默认仍只监听127.0.0.1。
@@ -83,6 +83,7 @@ Jev负责结构化判断，回复模型负责生成答案，二者各自计费�
 策略文件用 `BUSINESS_CONFIG` 指定；本地运行配置用 `BEAUTY_LOCAL_CONFIG` 指定，默认可选加载 `config/local.json`。改配置后需重启。
 产品知识仍只读取approved条目。策略reviewStatus用于标识版本状态，不再阻塞全部business资料。演示策略为demo-policy-v3，上传Skill后版本附加内容指纹，阈值未降低。
 推荐商品在产品JSON中使用可选的 `recommendation` 字段，包含 `category`、`shade`、`texture`、`keywords`、指向已审核事实的 `sourceId`，以及可选的HTTPS `imageUrl`、`price`。导购Skill的 `manifest.json` 可声明 `recommendation: {"category":"口红","maxClarifications":1}`。仅导入该Skill不会自动生成商品卡，还需导入带已审核事实的商品资料；业务商品与演示商品不能混在同一数据库。`npm run check:recommendation-live` 可用独立验收用户进行一次实际模型联调。
+面部区域图解原型位于 `skill-packages/face-area-visual-guide/`。在 `beauty-demo` 目录运行 `npm run sync:face-guide-demo` 会把ZIP生成到 `skill-packages/dist/` 并导入当前本地数据库；也可在运营端上传该ZIP。此能力作为附加图示，不依赖 Jev 将其选为唯一主Skill：用户问题或客服答复提及受支持面部位置时，用户端展示原创正面人像SVG动态高亮图，支持暂停与系统“减少动态效果”。问答涉及过敏/刺激时，图示只用于辨认位置，并明确提示不能据此继续涂抹。图示不使用自拍，不作个人肤质诊断、产品许可判断或医学按摩指导。小红书调研的未验证部分见 `docs/face-area-visual-research.md`。
 单次咨询整体上限45秒（Jev15秒、回复25秒）；取消会传播，并在人工接管后阻止迟到回答。
 
 ## 在Harness中调用
@@ -125,4 +126,5 @@ npm run mcp:token -- --user demo-user-a # 为本机Harness申请绑定用户的�
 - `server/mcp/`：Harness工具入口；不直接访问数据库。
 - `web/customer/`：用户前端；`web/operator/`：运营前端；`web/shared/`：公共主题。
 - [双端权限与Skill验收](docs/双端权限与Skill验收.md)：角色、登录、版本和执行证据。
+- [项目目录与本次变更](docs/项目目录与本次变更.md)：前后端、Skill 包的位置，以及本次图示/降级处理/历史记录修复清单。
 - `tests/`：隔离自动测试；`evals/`：开发冒烟案例，不冒充金标。

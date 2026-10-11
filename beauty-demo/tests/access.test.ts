@@ -108,8 +108,16 @@ test('customer response omits internal risk/model/config fields; operator can se
   assert.equal(response.status, 200); assert.equal(response.body.status, 'answered');
   for (const hidden of ['route', 'generation', 'diagnostics', 'warnings', 'policyStatus']) assert.equal(response.body[hidden], undefined);
   assert.equal(response.body.sources[0].title, '虚构资料：仅用于验证来源关联');
+  const savedAssistant = f.store.listMessages(customer.userId, session.sessionId, 20, 0).items.at(-1)!;
+  const savedMetadata = savedAssistant.metadata as Record<string, unknown>;
+  f.store.db.prepare('UPDATE messages SET metadata = ? WHERE id = ?').run(JSON.stringify({ ...savedMetadata,
+    status: 'clarification_required', warnings: ['JEV_ROUTER_FALLBACK'],
+    visualGuide: { region: 'nasolabial_fold', title: '法令纹在哪里', location: '鼻翼旁向嘴角延伸的两条弧线。',
+      application: '只用于辨认位置。', caution: '不判断皮肤问题。' } }), savedAssistant.messageId);
   const messages = (await f.request(`/api/customer/sessions/${session.sessionId}/messages`, 'GET', undefined, customer.headers)).body;
   assert.equal(messages.items[1].metadata, undefined);
+  assert.equal(messages.items[1].content, savedAssistant.content);
+  assert.equal(messages.items[1].visualGuide.region, 'nasolabial_fold');
   const list = (await f.request('/api/ops/runs', 'GET', undefined, op)).body.items;
   const detail = (await f.request(`/api/ops/runs/${list[0].runId}`, 'GET', undefined, op)).body;
   assert.ok(detail.events.some((event: { kind: string }) => event.kind === 'profile'));

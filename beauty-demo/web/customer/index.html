@@ -1,18 +1,66 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>专属美妆顾问</title><link rel="stylesheet" href="/shared/styles.css"><script type="module" src="/chat/app.js"></script></head>
-<body>
-  <header class="customer-shell"><div><div class="eyebrow">YOUR BEAUTY COMPANION</div><h1>你好，很高兴为你服务。</h1><p>聊聊产品、使用感受，或让我们帮你联系人工。</p></div><span id="service-status" class="badge">连接中</span></header>
-  <main class="customer-shell">
-    <div id="customer-notice" class="notice" role="status" aria-live="polite"></div>
-    <div class="toolbar"><label>本次咨询商品<select id="product-select" aria-label="本次咨询商品"></select></label><label class="grow">我的咨询记录<select id="sessions" aria-label="我的咨询记录"></select></label><button id="new-session">开始新咨询</button><span id="session-state" class="badge"></span></div>
-    <article class="panel">
-      <div id="messages" class="customer-messages" aria-live="polite"></div>
-      <form id="send-form"><label for="message">想问些什么？</label><textarea id="message" rows="3" maxlength="10000" placeholder="例如：想了解这款产品怎么使用。" required></textarea><div class="actions"><button id="send" class="primary">发送</button><button id="cancel" type="button" disabled>停止等待</button><button id="human" type="button">联系人工</button><button id="check" type="button" hidden>查看上次处理结果</button></div></form>
-    </article>
-    <details class="panel" id="profile"><summary>我的偏好与资料</summary><p class="small muted">只保存你确认的信息，用于下次提供更贴合的服务。可随时在这里修改或清空。</p>
-      <form id="card-form"><label for="preferences">偏好（每行一项）</label><textarea id="preferences" rows="2" placeholder="例如：喜欢清爽的质地"></textarea><label for="concerns">关注点（每行一项）</label><textarea id="concerns" rows="2"></textarea><div id="facts"></div><button class="primary">保存我的资料</button></form>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f4fc">
+  <title>专属美妆顾问</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <link rel="stylesheet" href="/chat/customer.css">
+  <script type="module" src="/chat/app.js"></script>
+</head>
+<body class="customer-page">
+  <div class="customer-page-grid" aria-hidden="true"></div>
+  <header class="customer-shell customer-header">
+    <a class="customer-brand" href="#home" aria-label="返回首页"><span class="brand-mark" aria-hidden="true">✦</span><span>暖颜<span class="brand-en">BEAUTY COMPANION</span></span></a>
+    <div class="customer-header-actions"><button id="home-link" type="button" class="header-link" hidden>返回首页</button><span id="service-status" class="badge customer-status">连接中</span></div>
+  </header>
+  <main class="customer-shell customer-main">
+    <section class="customer-home" id="home-view" aria-label="欢迎首页">
+    <div class="customer-hero" aria-labelledby="welcome-title">
+      <div class="hero-copy">
+        <p class="hero-kicker"><span class="hero-kicker-line"></span>温柔陪伴 · 清楚解答</p>
+        <h1 id="welcome-title">护肤不必懂术语，<br><em>慢慢聊，就会明白。</em></h1>
+        <p class="hero-lede">想知道护肤品怎么用、脸上的部位在哪里，或者只想问一句，都可以从这里开始。</p>
+        <div class="hero-actions"><button id="start-consultation" type="button" class="primary">开始咨询 <span aria-hidden="true">↗</span></button><button id="view-consultations" type="button">查看咨询记录</button></div>
+        <p class="hero-assurance">看图认部位 · 用白话说明 · 随时可找人工</p>
+      </div>
+      <div class="hero-art" aria-hidden="true"><span class="essence-aura"></span><img src="/chat/assets/essence-for.png" alt=""><span class="art-caption">ESSENCE / 原萃之光</span></div>
+    </div>
+    <div class="home-topic-heading"><p class="section-index">从一个熟悉的问题开始</p><h2>你可以这样问</h2></div>
+    <div class="home-topics">
+      <button class="topic-card" type="button" data-prompt="T区在哪里？可以用图标出来吗？"><img src="/chat/assets/essence-into.png" alt=""><span><strong>脸上哪里是 T 区？</strong><small>看图认识护肤部位</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-prompt="法令纹在脸上哪里？护肤品怎么轻柔涂抹？"><img src="/chat/assets/essence-for.png" alt=""><span><strong>法令纹怎么护理？</strong><small>用白话说明涂抹位置</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-prompt="我想了解这款产品怎么使用。"><img src="/chat/assets/essence-debate.png" alt=""><span><strong>这款产品怎么用？</strong><small>先核对资料，再给建议</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+    </div>
+    <p class="home-note">你也可以进入咨询后，直接用自己的话提问。</p>
+    </section>
+    <section class="customer-consult-view" id="consult-view" aria-label="在线咨询" hidden>
+    <div id="customer-notice" class="notice customer-notice" role="status" aria-live="polite"></div>
+    <div class="customer-consult-layout">
+    <aside class="session-sidebar" aria-label="咨询记录">
+      <div class="history-heading"><div><p class="section-index">我的记录</p><h2>聊过的话题</h2></div><span class="history-count" id="history-count">0</span></div>
+      <button id="new-session" type="button" class="new-session-button"><span aria-hidden="true">＋</span> 开始新咨询</button>
+      <nav id="session-groups" class="session-groups" aria-label="按话题分类的咨询记录"></nav>
+      <p class="history-note">只在此浏览器中显示你的咨询记录</p>
+    </aside>
+    <div class="consult-main">
+    <div class="customer-workspace">
+      <div class="workspace-heading"><div><p class="section-index">01 / 贴心咨询</p><h2>今天想了解什么？</h2></div><p>直接说你的问题，不需要记住专业名称。</p></div>
+      <div class="toolbar customer-toolbar"><label>本次咨询商品<select id="product-select" aria-label="本次咨询商品"></select></label><span id="session-state" class="badge"></span></div>
+      <article class="panel customer-conversation"><div class="conversation-title"><span class="conversation-icon" aria-hidden="true">✦</span><div><strong>专属美妆顾问</strong><small>认真听你说，慢慢讲清楚</small></div></div>
+        <div id="messages" class="customer-messages" aria-live="polite"></div>
+        <form id="send-form" class="customer-composer"><label for="message">想问些什么？</label><textarea id="message" rows="3" maxlength="10000" placeholder="例如：法令纹在脸上哪里？可以画图给我看看吗？" required></textarea><div class="actions"><button id="send" class="primary">发送问题 <span aria-hidden="true">↗</span></button><button id="cancel" type="button" disabled>停止等待</button><button id="human" type="button">联系人工</button><button id="check" type="button" hidden>查看上次处理结果</button></div></form>
+      </article>
+    </div>
+    <details class="panel customer-profile" id="profile"><summary><span class="profile-icon" aria-hidden="true">♡</span><span><strong>我的偏好与资料</strong><small>按你的习惯，提供更贴心的回答</small></span></summary><p class="small muted">只保存你确认的信息，用于下次提供更贴合的服务。可随时在这里修改或清空。</p>
+      <form id="card-form"><label for="preferences">偏好（每行一项）</label><textarea id="preferences" rows="2" placeholder="例如：喜欢清爽的质地"></textarea><label for="concerns">关注点（每行一项）</label><textarea id="concerns" rows="2"></textarea><div id="facts"></div><div class="actions"><button id="save-profile" class="primary">保存我的资料</button><span id="profile-feedback" class="form-feedback" role="status" aria-live="polite"></span></div></form>
     </details>
-    <p class="small muted">本演示通过当前浏览器保存匿名身份；清除浏览器Cookie后无法自动找回原身份。</p>
-  </main><footer class="customer-shell">依据可用资料回答 · 不确定时会向你确认 · 支持人工服务</footer>
-</body></html>
+    <p class="customer-privacy"><span aria-hidden="true">◌</span> 本演示通过当前浏览器保存匿名身份；清除浏览器 Cookie 后无法自动找回原身份。</p>
+    </div>
+    </div>
+    </section>
+  </main>
+  <footer class="customer-shell customer-footer"><span>暖颜 · 陪你从容护肤</span><span>依据可用资料回答 · 不确定时会向你确认 · 支持人工服务</span></footer>
+</body>
+</html>

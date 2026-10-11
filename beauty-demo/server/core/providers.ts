@@ -143,7 +143,7 @@ export class ChatProvider implements GenerationProvider {
           + '寒暄、情绪承接、服务引导和追问不要求产品事实，不要每次复述资料是虚构的。没有事实依据时明确不知道并提出具体下一步，不编造。'
           + `当前回复模式：${input.responseMode ?? 'answer'}。clarify时针对原问题自然追问，不给缺乏依据的肯定结论。`
           + 'answer模式先给有依据的实用建议，不重复追问；如给定productCards，只可引用其中商品和相应审核事实。商品卡由系统单独展示，回答可简短说明选择理由。没有卡时只给通用建议，不编造商品。'
-          + `sourceRefs允许的精确ID列表：${JSON.stringify(input.knowledge.sources.map(source => source.sourceId))}。只能从此列表取值，不要填写标题、路径或文件名。列表为空时sourceRefs必须为[]。`
+          + `sourceRefs允许的精确ID列表：${JSON.stringify(input.knowledge.sources.map(source => source.sourceId))}。只能从此列表取值，不要填写标题、路径或文件名。列表为空时sourceRefs必须为[]。当当前Skill要求知识依据、回复模式为answer且列表非空时，sourceRefs必须至少包含一个与答复相关的精确ID；不要遗漏这个字段。`
           + '仅返回JSON对象 {"answer":"简洁答复","sourceRefs":["实际使用的sourceId"]}；未使用任何产品事实可返回空sourceRefs，不得编造引用。\nSkill说明：' + input.skill.instructions },
         { role: 'user', content: JSON.stringify({ ...input, skill: { id: input.skill.id, version: input.skill.version, description: input.skill.description,
           requiresKnowledge: input.skill.requiresKnowledge } }) },

@@ -1,0 +1,9 @@
+{
+  "id": "face-area-visual-guide",
+  "version": "v1.3.0",
+  "description": "作为护肤问答的视觉附加能力，解释全脸涂抹范围、卧蚕眼周、T区、法令纹和局部起皮等面部位置并配具象动态高亮图；不处理诊断或按摩功效",
+  "intents": ["product_advice"],
+  "knowledgeScopes": ["product"],
+  "requiredFields": [],
+  "requiresKnowledge": false
+}

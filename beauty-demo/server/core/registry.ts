@@ -12,6 +12,33 @@ export function baseRoute(config: BusinessConfig, reason: string): RouteRecord {
     reasonCodes: [reason], ruleHits: [], model: null, rawAnswers: null, usage: null, latencyMs: 0,
   };
 }
+
+/**
+ * Availability-only Jev fallback. It deliberately avoids personalized product routing:
+ * routine questions use the broad product-consult skill, while any possible reaction or
+ * discomfort is sent to a clarifying response mode. Explicit emergency phrases are handled
+ * by ruleRoute before this function is reached.
+ */
+export function conservativeFallbackRoute(text: string, config: BusinessConfig): RouteRecord {
+  const normalized = text.toLowerCase();
+  const possibleReaction = /过敏|刺痛|疼痛|红肿|肿胀|发痒|瘙痒|不舒服|刺激|起疹|皮疹|湿疹|脱皮|灼热/.test(normalized);
+  const afterSales = /退货|退款|物流|快递|破损|投诉|售后/.test(normalized);
+  const emotional = /难过|焦虑|担心|生气|失望|烦恼|不开心/.test(normalized);
+  const intent = possibleReaction ? 'safety' : afterSales ? 'after_sales' : emotional ? 'emotional_support'
+    : /产品|面霜|乳液|护肤|眼霜|怎么用|用法|涂|抹|成分|价格|适合/.test(normalized) ? 'product_advice' : null;
+  const skill = intent ? config.skills.find(item => item.intents.includes(intent)) : undefined;
+  const route = {
+    ...baseRoute(config, 'JEV_TEMPORARILY_UNAVAILABLE'),
+    intent,
+    emotion: emotional || possibleReaction ? 'anxious' : 'neutral',
+    riskLevel: possibleReaction ? 'medium' as const : 'low' as const,
+    primarySkill: skill?.id ?? null,
+    action: possibleReaction ? 'clarify' as const : intent ? 'answer' as const : 'fallback' as const,
+    reasonCodes: ['CONSERVATIVE_LOCAL_ROUTER', ...(possibleReaction ? ['POSSIBLE_ADVERSE_REACTION'] : [])],
+  };
+  return route;
+}
+
 export function ruleRoute(text: string, config: BusinessConfig): { route: RouteRecord; message: string } | null {
   // Explicit phrase rules are editable fixtures, not a validated clinical classifier.
   const hits = config.rules.filter(rule => {

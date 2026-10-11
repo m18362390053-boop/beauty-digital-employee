@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { idSchema, type Card, type ProductDocument, type RouteDecision, skillDefinitionSchema } from '../contracts/index.js';
+import { faceRegions } from './face-guides.js';
 
 const probability = z.number().min(0).max(1);
 export const skillVersionSchema = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/);
@@ -57,6 +58,8 @@ export const consultResultSchema = z.object({
   messageId: idSchema.nullable(), sourceRefs: z.array(z.string()),
   productCards: z.array(z.object({ productId: idSchema, name: z.string(), shade: z.string(), texture: z.string(),
     imageUrl: z.string().optional(), price: z.number().optional(), sourceId: idSchema, dataKind: z.enum(['demo', 'business']) }).strict()).default([]),
+  visualGuide: z.object({ region: z.enum(faceRegions), title: z.string(), location: z.string(),
+    application: z.string(), caution: z.string() }).strict().nullable().default(null),
   route: z.record(z.unknown()).nullable(), warnings: z.array(z.string()),
   policyStatus: z.enum(['demo', 'reviewed']), dataKind: z.enum(['demo', 'business']),
   handoffId: idSchema.nullable(), generation: z.record(z.unknown()).nullable(),

@@ -1,10 +1,32 @@
+import { renderFaceGuide } from './face-illustration.js';
+
 const $ = id => document.getElementById(id);
-const state = { csrf: '', productId: '', sessionId: '', card: null, abort: null, pending: null };
+const state = { csrf: '', productId: '', sessionId: '', sessions: [], card: null, abort: null, pending: null };
 const labels = { AI_ACTIVE: '正在为你服务', HANDOFF_PENDING: '等待人工', HUMAN_ACTIVE: '人工已接入', RESOLVED: '服务已结束' };
+const shortLabels = { AI_ACTIVE: '服务中', HANDOFF_PENDING: '等人工', HUMAN_ACTIVE: '人工接入', RESOLVED: '已结束' };
 const roles = { user: '我', assistant: '美妆顾问', human: '人工客服', system: '服务提示' };
 const factLabels = { skinType: '你确认的肤质倾向', sensation: '使用感受', budget: '预算', texturePreference: '质地偏好' };
 function el(tag, text, className) { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; }
 function notice(text) { $('customer-notice').textContent = text; }
+function showView(view, focus = false) {
+  const consulting = view === 'consult';
+  $('home-view').hidden = consulting;
+  $('consult-view').hidden = !consulting;
+  $('home-link').hidden = !consulting;
+  document.title = consulting ? '在线咨询 · 暖颜' : '暖颜 · 专属美妆顾问';
+  if (focus && consulting) $('message').focus();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function openConsult(focus = false) { if (location.hash !== '#consult') location.hash = 'consult'; showView('consult', focus); }
+window.addEventListener('hashchange', () => showView(location.hash === '#consult' ? 'consult' : 'home'));
+$('home-link').addEventListener('click', () => { location.hash = 'home'; showView('home'); });
+$('start-consultation').addEventListener('click', () => openConsult(true));
+$('view-consultations').addEventListener('click', () => { openConsult(); $('sessions').focus(); });
+for (const button of document.querySelectorAll('.topic-card')) button.addEventListener('click', () => {
+  $('message').value = button.dataset.prompt ?? '';
+  openConsult(true);
+});
+showView(location.hash === '#consult' ? 'consult' : 'home');
 async function safely(fn) { try { await fn(); } catch { notice('暂时无法完成操作，请刷新后重试，或联系人工。'); } }
 async function api(path, method = 'GET', body, signal) {
   const response = await fetch(path, { method, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -18,9 +40,36 @@ function pending(value) { state.pending = value; $('check').hidden = !value; if 
 async function sessions() {
   const { items } = await api('/api/customer/sessions');
   if (!items.some(s => s.sessionId === state.sessionId)) state.sessionId = items.at(-1)?.sessionId ?? '';
-  $('sessions').replaceChildren();
-  for (const item of items) { const option = el('option', `${new Date(item.createdAt).toLocaleString()} · ${labels[item.status]}`); option.value = item.sessionId; $('sessions').append(option); }
-  $('sessions').value = state.sessionId; await messages();
+  state.sessions = items;
+  renderSessions();
+  await messages();
+}
+function renderSessions() {
+  const nav = $('session-groups'); nav.replaceChildren();
+  const grouped = new Map();
+  for (const item of [...state.sessions].reverse()) {
+    const topic = item.topic || '日常护肤';
+    if (!grouped.has(topic)) grouped.set(topic, []);
+    grouped.get(topic).push(item);
+  }
+  $('history-count').textContent = String(state.sessions.length);
+  if (!state.sessions.length) { nav.append(el('p', '还没有咨询记录，开始聊聊吧。', 'history-empty')); return; }
+  for (const [topic, items] of grouped) {
+    const group = el('section', undefined, 'session-topic-group');
+    group.append(el('h3', topic, 'session-topic-title'));
+    for (const item of items) {
+      const button = el('button', undefined, `session-history-item${item.sessionId === state.sessionId ? ' active' : ''}`);
+      button.type = 'button'; button.dataset.sessionId = item.sessionId;
+      if (item.sessionId === state.sessionId) button.setAttribute('aria-current', 'page');
+      button.disabled = Boolean(state.abort);
+      button.append(el('strong', item.summary || '新咨询', 'session-summary'),
+        el('span', item.preview && item.preview !== item.summary ? item.preview : (item.summary === '新咨询' ? '还没有发送消息' : labels[item.status] || '咨询记录'), 'session-preview'));
+      const footer = el('span', undefined, 'session-meta');
+      footer.append(el('span', shortLabels[item.status] || '咨询记录'), el('time', new Date(item.createdAt).toLocaleDateString()));
+      button.append(footer); group.append(button);
+    }
+    nav.append(group);
+  }
 }
 async function newSession() {
   state.productId = $('product-select').value || state.productId;
@@ -49,6 +98,7 @@ async function messages() {
       }
       bubble.append(cards);
     }
+    if (message.visualGuide) { const guide = renderFaceGuide(message.visualGuide); if (guide) bubble.append(guide); }
     if (['assistant', 'human'].includes(message.role)) {
       const buttons = el('div', undefined, 'actions');
       for (const [text, type] of [['有帮助', 'helpful'], ['没解决', 'unresolved'], ['需要人工', 'request_human']]) {
@@ -68,7 +118,10 @@ function renderCard(card) {
     const label = el('label', factLabels[key] ?? key); const input = document.createElement('input'); input.dataset.field = key; input.maxLength = 1000; input.value = card.confirmedFacts[key]?.value ?? ''; label.append(input); $('facts').append(label);
   }
 }
-$('card-form').addEventListener('submit', event => { event.preventDefault(); safely(async () => {
+$('card-form').addEventListener('submit', event => { event.preventDefault(); (async () => {
+  const button = $('save-profile'); const feedback = $('profile-feedback');
+  button.disabled = true; button.textContent = '正在保存…'; feedback.className = 'form-feedback'; feedback.textContent = '正在保存你的资料…';
+  try {
   const facts = {};
   for (const input of $('facts').querySelectorAll('input')) {
     const value = input.value.trim(); if (!value) continue;
@@ -76,21 +129,31 @@ $('card-form').addEventListener('submit', event => { event.preventDefault(); saf
   }
   const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
   const result = await api('/api/customer/card', 'PATCH', { expectedVersion: state.card.version, confirmedFacts: facts, preferences: lines('preferences'), concerns: lines('concerns') });
-  renderCard(result); notice('你的资料已保存。');
-}); });
+  renderCard(result); notice('你的资料已保存。'); feedback.classList.add('success'); feedback.textContent = '已保存，下次咨询会参考这些信息。';
+  } catch (error) {
+    const message = error instanceof Error && error.message === 'CARD_VERSION_CONFLICT'
+      ? '资料刚刚有更新，请刷新页面后再保存。'
+      : '暂时没有保存成功，请稍后重试。';
+    notice(message); feedback.classList.add('error'); feedback.textContent = message;
+  } finally { button.disabled = false; button.textContent = '保存我的资料'; }
+})(); });
 $('new-session').addEventListener('click', () => safely(newSession));
-$('sessions').addEventListener('change', () => safely(async () => { state.sessionId = $('sessions').value; await messages(); }));
+$('session-groups').addEventListener('click', event => {
+  const button = event.target.closest('[data-session-id]');
+  if (!button || button.disabled) return;
+  safely(async () => { state.sessionId = button.dataset.sessionId; renderSessions(); await messages(); });
+});
 $('send-form').addEventListener('submit', event => { event.preventDefault(); safely(async () => {
   if (state.abort) return;
   const content = $('message').value.trim(); if (!content) return;
   if (!state.sessionId && !await newSession()) return;
   const attempt = { sessionId: state.sessionId, requestId: crypto.randomUUID() }; pending(attempt);
-  state.abort = new AbortController(); $('send').disabled = true; $('cancel').disabled = false; $('sessions').disabled = true; $('new-session').disabled = true; notice('正在理解你的问题、核对可用资料…');
+  state.abort = new AbortController(); $('send').disabled = true; $('cancel').disabled = false; renderSessions(); $('new-session').disabled = true; notice('正在理解你的问题、核对可用资料…');
   try {
     const result = await api(`${path()}/consult`, 'POST', { requestId: attempt.requestId, content }, state.abort.signal);
     notice(result.message); $('message').value = ''; pending(null);
   } catch (error) { notice(error.name === 'AbortError' ? '已停止等待，可以查看上次处理结果。' : '连接暂时中断，先查看上次处理结果，避免重复发送。'); }
-  finally { state.abort = null; $('send').disabled = false; $('cancel').disabled = true; $('sessions').disabled = false; $('new-session').disabled = false; await messages(); }
+  finally { state.abort = null; $('send').disabled = false; $('cancel').disabled = true; $('new-session').disabled = false; await sessions(); }
 }); });
 $('cancel').addEventListener('click', () => state.abort?.abort());
 $('human').addEventListener('click', () => safely(async () => { if (!state.sessionId && !await newSession()) return; const result = await api(`${path()}/handoff`, 'POST', { reason: '用户请求人工服务' }); notice(result.message); await messages(); }));

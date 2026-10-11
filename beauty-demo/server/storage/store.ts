@@ -321,7 +321,10 @@ export class Store {
   listSessions(userId: string) {
     this.getCard(userId);
     return this.db.prepare(`SELECT id AS sessionId, user_id AS userId, product_id AS productId,
-      status, state_version AS stateVersion, created_at AS createdAt FROM sessions WHERE user_id = ? ORDER BY created_at, id`).all(userId);
+      status, state_version AS stateVersion, created_at AS createdAt,
+      (SELECT content FROM messages WHERE session_id = sessions.id AND role = 'user' ORDER BY sequence LIMIT 1) AS firstUserMessage,
+      (SELECT content FROM messages WHERE session_id = sessions.id AND role = 'user' ORDER BY sequence DESC LIMIT 1) AS latestUserMessage
+      FROM sessions WHERE user_id = ? ORDER BY created_at, id`).all(userId);
   }
 
   getSession(userId: string, sessionId: string): SessionRow {

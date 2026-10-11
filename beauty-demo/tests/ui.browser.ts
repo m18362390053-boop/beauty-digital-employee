@@ -13,6 +13,7 @@ import { createApp } from '../server/app.js';
 import { ModelSettings } from '../server/core/model-settings.js';
 import { JevProvider, ChatProvider } from '../server/core/providers.js';
 import { SkillPackages } from '../server/core/skill-packages.js';
+import { FACE_GUIDE_SKILL_ID } from '../server/core/face-guides.js';
 import { testAccess, testOperatorPassword } from './access-helper.js';
 
 const executablePath = process.env.BROWSER_PATH ?? [
@@ -215,11 +216,16 @@ test('browser: separate customer/operator contexts share a real handoff without 
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     const errors: string[] = []; customer.on('pageerror', error => errors.push(error.message)); operator.on('pageerror', error => errors.push(error.message));
     await customer.goto(base + '/'); await customer.locator('#service-status').getByText('欢迎咨询').waitFor();
+    assert.equal(await customer.locator('#home-view').isVisible(), true);
+    assert.equal(await customer.locator('#consult-view').isVisible(), false);
+    await customer.locator('#start-consultation').click();
+    assert.equal(await customer.locator('#consult-view').isVisible(), true);
     assert.equal(await customer.locator('#typesafe-key').count(), 0); assert.equal(await customer.locator('#user-select').count(), 0);
     assert.equal(await customer.locator('#route-result').count(), 0);
     await customer.locator('#profile summary').click(); await customer.locator('#preferences').fill('喜欢清爽');
     const save = customer.waitForResponse(r => r.url().endsWith('/api/customer/card') && r.request().method() === 'PATCH');
     await customer.getByRole('button', { name: '保存我的资料' }).click(); assert.equal((await save).status(), 200);
+    await customer.getByText('已保存，下次咨询会参考这些信息。', { exact: true }).waitFor();
     await customer.locator('#message').fill('请介绍产品');
     const consultation = customer.waitForResponse(r => r.url().endsWith('/consult'));
     await customer.locator('#send').click();
@@ -276,6 +282,7 @@ test('browser: customer sees sourced product cards after one guide clarification
   try {
     const page = await browser.newPage(); page.setDefaultTimeout(10_000);
     await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/chat/`);
+    await page.locator('#start-consultation').click();
     await page.locator('#service-status').getByText('欢迎咨询').waitFor();
     await page.locator('#message').fill('想买自然的口红'); await page.locator('#send').click();
     await page.getByText('喜欢什么风格？').waitFor();
@@ -283,6 +290,59 @@ test('browser: customer sees sourced product cards after one guide clarification
     await page.locator('.product-card').first().waitFor();
     assert.equal(await page.locator('.product-card').count(), 2);
     assert.match(await page.locator('.product-card').first().innerText(), /演示商品[\s\S]*资料依据/);
+  } finally {
+    await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
+    store.close(); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('browser: face-area diagram shows a pausable under-eye highlight with separate application boundary', {
+  timeout: 45_000, skip: !executablePath && 'Set BROWSER_PATH',
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'beauty-face-ui-')); const store = new Store(join(dir, 'ui.sqlite'));
+  store.importProduct(JSON.parse(await readFile(resolve('content/templates/product.demo.json'), 'utf8')));
+  const config = loadBusinessConfig();
+  const service = new CustomerService(store, { config,
+    router: { configured: true, decide: async () => ({ ...baseRoute(config, 'UI_TEST'), routeStatus: 'jev', intent: 'product_advice',
+      riskLevel: 'low', primarySkill: FACE_GUIDE_SKILL_ID, action: 'answer' }) },
+    generator: { configured: true, generate: async () => ({ answer: '卧蚕就在下睫毛下面。眼周产品请先看标签，再轻点涂开。',
+      sourceRefs: [], model: 'browser-test', usage: {} }) },
+  });
+  service.skills.import({ filename: 'face-guide.json', content: JSON.stringify({ id: FACE_GUIDE_SKILL_ID, version: 'ui-v1',
+    description: '面部位置示意', intents: ['product_advice'], knowledgeScopes: ['product'], requiredFields: [],
+    requiresKnowledge: false, instructions: '区分部位位置和产品涂抹范围', knowledge: [] }) });
+  const server = createApp(store, service, { access: testAccess(store) }).listen(0, '127.0.0.1');
+  await new Promise<void>(r => server.once('listening', r));
+  const browser = await chromium.launch({ executablePath, headless: true, timeout: 20_000 });
+  try {
+    const page = await browser.newPage(); page.setDefaultTimeout(10_000);
+    await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/chat/`);
+    await page.locator('#start-consultation').click();
+    await page.locator('#message').fill('卧蚕在哪里，怎么涂眼霜？');
+    const response = page.waitForResponse(r => r.url().endsWith('/consult'));
+    await page.locator('#send').click();
+    assert.equal((await (await response).json()).visualGuide.region, 'under_eye');
+    await page.locator('.face-guide svg[role="img"]').waitFor();
+    assert.equal(await page.locator('.face-guide .face-highlight').count(), 2);
+    assert.equal(await page.locator('.face-guide .face-application-boundary').count(), 1);
+    await page.getByRole('button', { name: '暂停高亮' }).click();
+    assert.equal(await page.locator('.face-guide.paused').count(), 1);
+    assert.match(await page.locator('.face-guide').innerText(), /不是按摩路线/);
+    await mkdir(resolve('test-results'), { recursive: true });
+    await page.locator('.face-guide[data-region="under_eye"]').screenshot({ path: resolve('test-results/face-area-guide.png') });
+    for (const [question, region, screenshot] of [
+      ['油皮区域一般是哪里？', 't_zone', 'face-t-zone.png'],
+      ['法令纹具体在哪里？', 'nasolabial_fold', 'face-nasolabial-fold.png'],
+      ['鼻翼旁容易起死皮是哪里？', 'flaky_area', 'face-flaky-area.png'],
+      ['面霜怎么涂到脸上？', 'full_face', 'face-full-face.png'],
+    ] as const) {
+      await page.locator('#message').fill(question);
+      const next = page.waitForResponse(r => r.url().endsWith('/consult'));
+      await page.locator('#send').click();
+      assert.equal((await (await next).json()).visualGuide.region, region);
+      await page.locator(`.face-guide[data-region="${region}"]`).waitFor();
+      await page.locator(`.face-guide[data-region="${region}"]`).screenshot({ path: resolve(`test-results/${screenshot}`) });
+    }
   } finally {
     await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
     store.close(); await rm(dir, { recursive: true, force: true });

@@ -92,7 +92,7 @@ export class Workflows {
       if (row.result_json) return JSON.parse(row.result_json) as ConsultResult;
       const session = this.store.getSession(userId, result.sessionId);
       if (requireActive && (session.status !== 'AI_ACTIVE' || session.stateVersion !== expectedVersion)) {
-        result = { ...result, status: 'interrupted', answer: null, answerKind: 'none', sourceRefs: [], productCards: [], messageId: null, warnings: [...result.warnings, 'SESSION_CHANGED'] };
+        result = { ...result, status: 'interrupted', answer: null, answerKind: 'none', sourceRefs: [], productCards: [], visualGuide: null, messageId: null, warnings: [...result.warnings, 'SESSION_CHANGED'] };
       }
       if (result.answer !== null) {
         const role = ['handoff_pending', 'human_active', 'resolved'].includes(result.status) ? 'system' : 'assistant';
@@ -100,7 +100,7 @@ export class Workflows {
         db.prepare('INSERT INTO messages(id,session_id,request_id,role,content,created_at,metadata) VALUES(?,?,?,?,?,?,?)').run(
           result.messageId, result.sessionId, `response-${result.runId}`, role, result.answer, now(),
           JSON.stringify({ runId: result.runId, status: result.status, answerKind: result.answerKind, sourceRefs: result.sourceRefs,
-            productCards: result.productCards, route: result.route, warnings: result.warnings, dataKind: result.dataKind }),
+            productCards: result.productCards, visualGuide: result.visualGuide, route: result.route, warnings: result.warnings, dataKind: result.dataKind }),
         );
       }
       db.prepare("UPDATE consultation_runs SET state = 'completed', result_json = ?, updated_at = ? WHERE id = ?")
@@ -120,7 +120,7 @@ export class Workflows {
       const result: ConsultResult = {
         runId: row.id, requestId: row.request_id, sessionId, status: 'interrupted', answer: null, answerKind: 'none', messageId: null,
         sourceRefs: [], route: route ? { ...route } : null, warnings: [reason], policyStatus: route?.policyStatus ?? 'demo',
-        dataKind: product.dataKind, handoffId: null, generation: null, productCards: [],
+        dataKind: product.dataKind, handoffId: null, generation: null, productCards: [], visualGuide: null,
       };
       db.prepare("UPDATE consultation_runs SET state = 'interrupted', result_json = ?, updated_at = ? WHERE id = ?")
         .run(JSON.stringify(result), now(), row.id);

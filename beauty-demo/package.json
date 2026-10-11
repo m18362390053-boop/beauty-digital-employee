@@ -11,6 +11,7 @@
     "test": "npm run build && node --test dist/tests/foundation.test.js dist/tests/mcp.test.js dist/tests/workflow.test.js dist/tests/local-runtime.test.js dist/tests/authoring.test.js dist/tests/provider-network.test.js dist/tests/access.test.js",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "sync:recommendation-demo": "tsx scripts/sync-recommendation-demo.ts",
+    "sync:face-guide-demo": "tsx scripts/sync-face-guide-demo.ts",
     "check:recommendation-live": "tsx scripts/check-recommendation-live.ts",
     "smoke": "npm run build && tsx scripts/smoke.ts",
     "mcp": "node dist/server/mcp/index.js",
