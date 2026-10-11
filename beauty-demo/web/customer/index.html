@@ -7,31 +7,35 @@
   <title>专属美妆顾问</title>
   <link rel="stylesheet" href="/shared/styles.css">
   <link rel="stylesheet" href="/chat/customer.css">
+  <link rel="stylesheet" href="/chat/motion/v3-motion.css">
+  <script defer src="/chat/assets/three.min.js"></script>
   <script type="module" src="/chat/app.js"></script>
 </head>
 <body class="customer-page">
   <div class="customer-page-grid" aria-hidden="true"></div>
+  <canvas id="cursor-spray" class="cursor-spray" aria-hidden="true"></canvas>
+  <div id="motion-butterfly" class="motion-butterfly" data-state="resting" aria-hidden="true"><img src="/chat/assets/butterfly-flight.png" alt=""></div>
   <header class="customer-shell customer-header">
     <a class="customer-brand" href="#home" aria-label="返回首页"><span class="brand-mark" aria-hidden="true">✦</span><span>暖颜<span class="brand-en">BEAUTY COMPANION</span></span></a>
     <div class="customer-header-actions"><button id="home-link" type="button" class="header-link" hidden>返回首页</button><span id="service-status" class="badge customer-status">连接中</span></div>
   </header>
   <main class="customer-shell customer-main">
     <section class="customer-home" id="home-view" aria-label="欢迎首页">
-    <div class="customer-hero" aria-labelledby="welcome-title">
+    <div class="customer-hero" aria-labelledby="welcome-title" data-flight-obstacle>
       <div class="hero-copy">
         <p class="hero-kicker"><span class="hero-kicker-line"></span>温柔陪伴 · 清楚解答</p>
         <h1 id="welcome-title">护肤不必懂术语，<br><em>慢慢聊，就会明白。</em></h1>
         <p class="hero-lede">想知道护肤品怎么用、脸上的部位在哪里，或者只想问一句，都可以从这里开始。</p>
-        <div class="hero-actions"><button id="start-consultation" type="button" class="primary">开始咨询 <span aria-hidden="true">↗</span></button><button id="view-consultations" type="button">查看咨询记录</button></div>
-        <p class="hero-assurance">看图认部位 · 用白话说明 · 随时可找人工</p>
+        <div class="hero-actions"><button id="start-consultation" type="button" class="primary" data-motion-button data-spec>开始咨询 <span aria-hidden="true">↗</span></button><button id="view-consultations" type="button" data-motion-button data-spec>查看咨询记录</button><button id="start-video-moment" type="button" data-motion-button data-spec>悦见时刻 · 照片成片</button></div>
+        <p class="hero-assurance">看图认部位 · 用白话说明 · 悦见时刻 · 随时可找人工</p>
       </div>
-      <div class="hero-art" aria-hidden="true"><span class="essence-aura"></span><img src="/chat/assets/essence-for.png" alt=""><span class="art-caption">ESSENCE / 原萃之光</span></div>
+      <div class="hero-art" aria-hidden="true" data-liquid-blob><span class="essence-aura"></span><img src="/chat/assets/essence-for.png" alt=""><span class="art-caption">ESSENCE / 原萃之光</span><span class="butterfly-anchor" data-butterfly-anchor="home"></span></div>
     </div>
     <div class="home-topic-heading"><p class="section-index">从一个熟悉的问题开始</p><h2>你可以这样问</h2></div>
     <div class="home-topics">
-      <button class="topic-card" type="button" data-prompt="T区在哪里？可以用图标出来吗？"><img src="/chat/assets/essence-into.png" alt=""><span><strong>脸上哪里是 T 区？</strong><small>看图认识护肤部位</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
-      <button class="topic-card" type="button" data-prompt="法令纹在脸上哪里？护肤品怎么轻柔涂抹？"><img src="/chat/assets/essence-for.png" alt=""><span><strong>法令纹怎么护理？</strong><small>用白话说明涂抹位置</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
-      <button class="topic-card" type="button" data-prompt="我想了解这款产品怎么使用。"><img src="/chat/assets/essence-debate.png" alt=""><span><strong>这款产品怎么用？</strong><small>先核对资料，再给建议</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-spec data-liquid-blob data-prompt="T区在哪里？可以用图标出来吗？"><img src="/chat/assets/essence-into.png" alt=""><span><strong>脸上哪里是 T 区？</strong><small>看图认识护肤部位</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-spec data-liquid-blob data-prompt="法令纹在脸上哪里？护肤品怎么轻柔涂抹？"><img src="/chat/assets/essence-for.png" alt=""><span><strong>法令纹怎么护理？</strong><small>用白话说明涂抹位置</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-spec data-liquid-blob data-prompt="我想了解这款产品怎么使用。"><img src="/chat/assets/essence-debate.png" alt=""><span><strong>这款产品怎么用？</strong><small>先核对资料，再给建议</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
     </div>
     <p class="home-note">你也可以进入咨询后，直接用自己的话提问。</p>
     </section>
@@ -48,7 +52,7 @@
     <div class="customer-workspace">
       <div class="workspace-heading"><div><p class="section-index">01 / 贴心咨询</p><h2>今天想了解什么？</h2></div><p>直接说你的问题，不需要记住专业名称。</p></div>
       <div class="toolbar customer-toolbar"><label>本次咨询商品<select id="product-select" aria-label="本次咨询商品"></select></label><span id="session-state" class="badge"></span></div>
-      <article class="panel customer-conversation"><div class="conversation-title"><span class="conversation-icon" aria-hidden="true">✦</span><div><strong>专属美妆顾问</strong><small>认真听你说，慢慢讲清楚</small></div></div>
+      <article class="panel customer-conversation" data-flight-obstacle><div class="conversation-title"><span class="conversation-icon" aria-hidden="true">✦</span><div><strong>专属美妆顾问</strong><small>认真听你说，慢慢讲清楚</small></div><span class="butterfly-anchor" data-butterfly-anchor="consult" aria-hidden="true"></span></div>
         <div id="messages" class="customer-messages" aria-live="polite"></div>
         <form id="send-form" class="customer-composer"><label for="message">想问些什么？</label><textarea id="message" rows="3" maxlength="10000" placeholder="例如：法令纹在脸上哪里？可以画图给我看看吗？" required></textarea><div class="actions"><button id="send" class="primary">发送问题 <span aria-hidden="true">↗</span></button><button id="cancel" type="button" disabled>停止等待</button><button id="human" type="button">联系人工</button><button id="check" type="button" hidden>查看上次处理结果</button></div></form>
       </article>
@@ -61,6 +65,14 @@
     </div>
     </section>
   </main>
+  <dialog id="video-moment-dialog" class="video-moment-dialog" aria-labelledby="video-moment-title">
+    <form method="dialog" class="video-moment-head"><div><p class="section-index">悦见时刻 / 测试入口</p><h2 id="video-moment-title">把护肤照片整理成一段约 15 秒的回忆</h2></div><button type="submit" class="dialog-close" aria-label="关闭悦见时刻">×</button></form>
+    <p class="video-moment-intro">点击“＋ 添加照片”，选择你明确授权的照片。建议 15 张，系统只接收素材；当前未接入视频服务，不会生成或假装生成视频。</p>
+    <div class="video-moment-actions"><button id="video-add-photos" type="button" class="primary"><span aria-hidden="true">＋</span> 添加照片</button><input id="video-photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><span id="video-photo-count" class="video-count">已选 0 / 建议 15 张</span></div>
+    <div id="video-photo-list" class="video-photo-list" aria-live="polite"><p class="muted">还没有选择照片。可一次选多张，也可分次补充。</p></div>
+    <label class="video-authorize"><input id="video-authorize" type="checkbox"> 我确认这些照片由我授权用于本机“悦见时刻”测试；不上传到外部视频服务。</label>
+    <div class="video-moment-actions"><button id="video-submit" type="button" class="primary" disabled>测试此 Skill</button><span id="video-moment-feedback" class="form-feedback" role="status" aria-live="polite"></span></div>
+  </dialog>
   <footer class="customer-shell customer-footer"><span>暖颜 · 陪你从容护肤</span><span>依据可用资料回答 · 不确定时会向你确认 · 支持人工服务</span></footer>
 </body>
 </html>

@@ -18,7 +18,7 @@ export class Store {
   /** Shared by local repositories; never exposed through HTTP. */
   readonly db: DatabaseSync;
 
-  constructor(path: string) {
+  constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');

@@ -41,7 +41,9 @@ export function createApp(store: Store, service = new CustomerService(store), op
     if (req.headers['sec-fetch-site'] === 'cross-site') throw new AppError(403, 'ORIGIN_NOT_ALLOWED', 'Cross-site requests are disabled');
     next();
   });
-  app.use(express.json({ limit: '8mb' }));
+  // Customer-authorised video-moment photo batches are compressed in the browser and
+  // capped again by their endpoint, but need more room than an ordinary chat payload.
+  app.use(express.json({ limit: '18mb' }));
   app.use('/chat', express.static(resolve('web/customer'), { index: 'index.html' }));
   app.use('/ops', express.static(resolve('web/operator'), { index: 'index.html' }));
   app.use('/shared', express.static(resolve('web/shared')));

@@ -111,6 +111,27 @@
 .customer-footer { display: flex; justify-content: space-between; gap: 20px; padding: 22px 28px 38px; border-top: 1px solid #e7dcee; font-size: 12px; }
 .customer-footer span:first-child { color: #755289; font-weight: 700; }
 .customer-page .face-guide { max-width: 100%; }
+.video-moment-dialog { width: min(720px, calc(100vw - 28px)); max-height: min(82vh, 760px); padding: 0; border: 1px solid #ddcce7; border-radius: 22px; background: #fffdfd; color: #453552; box-shadow: 0 24px 70px #35213c55; }
+.video-moment-dialog::backdrop { background: #281d31a8; backdrop-filter: blur(3px); }
+.video-moment-head { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding: 25px 27px 18px; border-bottom: 1px solid #eee3f1; background: linear-gradient(110deg, #fffdfa, #f5eafa); }
+.video-moment-head .section-index { margin: 0 0 4px; }
+.video-moment-head h2 { margin: 0; color: #4c365e; font: 600 25px/1.35 Georgia, "Songti SC", serif; }
+.dialog-close { width: 36px; height: 36px; padding: 0; border: 1px solid #decbe8; border-radius: 50%; background: #fff; color: #75568a; font-size: 25px; line-height: 1; }
+.video-moment-intro { margin: 20px 27px 15px; color: #70617a; font-size: 14px; line-height: 1.7; }
+.video-moment-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; margin: 14px 27px; }
+.video-moment-actions .primary { min-height: 42px; }
+.video-count { color: #846f91; font-size: 13px; font-weight: 700; }
+.video-photo-list { display: grid; gap: 8px; min-height: 84px; max-height: 300px; margin: 0 27px; padding: 12px; border: 1px dashed #ddcbe6; border-radius: 13px; background: #fbf8fc; overflow: auto; }
+.video-photo-list > .muted { align-self: center; margin: 0; text-align: center; }
+.video-photo-item { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 7px; border-radius: 10px; background: #fff; box-shadow: 0 1px 4px #58396912; }
+.video-photo-item img { width: 54px; height: 42px; border-radius: 7px; object-fit: cover; background: #eee8f0; }
+.video-photo-item strong, .video-photo-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-photo-item strong { color: #53415f; font-size: 13px; }
+.video-photo-item small { margin-top: 2px; color: #938198; font-size: 11px; }
+.video-remove { padding: 5px 8px; border: 0; background: transparent; color: #956374; box-shadow: none; font-size: 12px; }
+.video-authorize { display: flex; align-items: flex-start; gap: 9px; margin: 17px 27px 8px; color: #62536d; font-size: 13px; line-height: 1.55; }
+.video-authorize input { width: 18px; height: 18px; margin-top: 2px; accent-color: #765091; }
+@media (max-width: 520px) { .video-moment-head { padding: 20px 18px 15px; } .video-moment-head h2 { font-size: 21px; } .video-moment-intro, .video-moment-actions, .video-photo-list, .video-authorize { margin-left: 18px; margin-right: 18px; } }
 @media (max-width: 820px) {
   .customer-main { padding: 10px 17px 30px; }
   .customer-header { padding: 17px; }

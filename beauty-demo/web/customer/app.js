@@ -1,14 +1,18 @@
 import { renderFaceGuide } from './face-illustration.js';
+import { createPageTransition } from './motion/page-transition.js';
+import { createButterflyFlight } from './motion/butterfly-flight.js';
+import { initPointerLighting } from './motion/pointer-lighting.js';
+import { initCursorParticles } from './motion/cursor-particles.js';
 
 const $ = id => document.getElementById(id);
-const state = { csrf: '', productId: '', sessionId: '', sessions: [], card: null, abort: null, pending: null };
+const state = { csrf: '', productId: '', sessionId: '', sessions: [], card: null, abort: null, pending: null, videoPhotos: [] };
 const labels = { AI_ACTIVE: '正在为你服务', HANDOFF_PENDING: '等待人工', HUMAN_ACTIVE: '人工已接入', RESOLVED: '服务已结束' };
 const shortLabels = { AI_ACTIVE: '服务中', HANDOFF_PENDING: '等人工', HUMAN_ACTIVE: '人工接入', RESOLVED: '已结束' };
 const roles = { user: '我', assistant: '美妆顾问', human: '人工客服', system: '服务提示' };
 const factLabels = { skinType: '你确认的肤质倾向', sensation: '使用感受', budget: '预算', texturePreference: '质地偏好' };
 function el(tag, text, className) { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; }
 function notice(text) { $('customer-notice').textContent = text; }
-function showView(view, focus = false) {
+function renderView(view, focus = false) {
   const consulting = view === 'consult';
   $('home-view').hidden = consulting;
   $('consult-view').hidden = !consulting;
@@ -17,16 +21,31 @@ function showView(view, focus = false) {
   if (focus && consulting) $('message').focus();
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
+const butterflyFlight = createButterflyFlight($('motion-butterfly'));
+const transitionTo = createPageTransition({ render: renderView, afterRender: (view, animated) => butterflyFlight.moveTo(view, animated) });
+let currentView = null;
+function showView(view, focus = false, animate = true) {
+  if (currentView === view) { if (focus && view === 'consult') $('message').focus(); return; }
+  currentView = view;
+  void transitionTo(view, { animate, focus });
+}
 function openConsult(focus = false) { if (location.hash !== '#consult') location.hash = 'consult'; showView('consult', focus); }
 window.addEventListener('hashchange', () => showView(location.hash === '#consult' ? 'consult' : 'home'));
 $('home-link').addEventListener('click', () => { location.hash = 'home'; showView('home'); });
 $('start-consultation').addEventListener('click', () => openConsult(true));
-$('view-consultations').addEventListener('click', () => { openConsult(); $('sessions').focus(); });
+$('view-consultations').addEventListener('click', () => { openConsult(); $('new-session').focus(); });
+const videoDialog = $('video-moment-dialog');
+$('start-video-moment').addEventListener('click', () => {
+  if (typeof videoDialog.showModal === 'function') videoDialog.showModal();
+  else videoDialog.setAttribute('open', '');
+});
 for (const button of document.querySelectorAll('.topic-card')) button.addEventListener('click', () => {
   $('message').value = button.dataset.prompt ?? '';
   openConsult(true);
 });
-showView(location.hash === '#consult' ? 'consult' : 'home');
+showView(location.hash === '#consult' ? 'consult' : 'home', false, false);
+initPointerLighting();
+initCursorParticles($('cursor-spray'));
 async function safely(fn) { try { await fn(); } catch { notice('暂时无法完成操作，请刷新后重试，或联系人工。'); } }
 async function api(path, method = 'GET', body, signal) {
   const response = await fetch(path, { method, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -37,6 +56,62 @@ async function api(path, method = 'GET', body, signal) {
 }
 const path = () => `/api/customer/sessions/${state.sessionId}`;
 function pending(value) { state.pending = value; $('check').hidden = !value; if (value) sessionStorage.setItem('customer-pending', JSON.stringify(value)); else sessionStorage.removeItem('customer-pending'); }
+const supportedPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+function formatBytes(value) { return value < 1024 * 1024 ? `${Math.ceil(value / 1024)} KB` : `${(value / 1024 / 1024).toFixed(1)} MB`; }
+function refreshVideoMoment() {
+  const count = state.videoPhotos.length;
+  $('video-photo-count').textContent = `已选 ${count} / 建议 15 张`;
+  const list = $('video-photo-list'); list.replaceChildren();
+  if (!count) list.append(el('p', '还没有选择照片。可一次选多张，也可分次补充。', 'muted'));
+  for (const [index, photo] of state.videoPhotos.entries()) {
+    const item = el('article', undefined, 'video-photo-item');
+    const preview = el('img'); preview.src = `data:${photo.mediaType};base64,${photo.dataBase64}`; preview.alt = `已选照片 ${index + 1}`;
+    const copy = el('div'); copy.append(el('strong', `${index + 1}. ${photo.originalName}`),
+      el('small', `${new Date(photo.capturedAt).toLocaleDateString()} · ${formatBytes(photo.byteSize)}`));
+    const remove = el('button', '移除', 'video-remove'); remove.type = 'button'; remove.addEventListener('click', () => { state.videoPhotos.splice(index, 1); refreshVideoMoment(); });
+    item.append(preview, copy, remove); list.append(item);
+  }
+  $('video-submit').disabled = count < 5 || !$('video-authorize').checked;
+}
+function readDataUrl(file) {
+  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
+}
+async function shrinkPhoto(file) {
+  const source = await readDataUrl(file);
+  const image = new Image(); image.src = source; await image.decode();
+  const maximum = 1280; const scale = Math.min(1, maximum / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d'); context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const output = canvas.toDataURL('image/jpeg', 0.72); const dataBase64 = output.slice(output.indexOf(',') + 1); const byteSize = Math.floor(dataBase64.length * 3 / 4);
+  if (byteSize > 900 * 1024) throw new Error('压缩后仍超过900KB，请换一张较小的照片。');
+  return { photoId: `photo-${state.videoPhotos.length + 1}`, originalName: file.name.slice(0, 180) || '未命名照片.jpg',
+    mediaType: 'image/jpeg', capturedAt: new Date(file.lastModified || Date.now()).toISOString(), dataBase64, byteSize };
+}
+$('video-add-photos').addEventListener('click', () => $('video-photo-input').click());
+$('video-photo-input').addEventListener('change', async event => {
+  const input = event.currentTarget; const files = [...input.files ?? []]; input.value = '';
+  const remaining = 20 - state.videoPhotos.length;
+  const accepted = files.filter(file => supportedPhotoTypes.has(file.type)).slice(0, remaining);
+  if (!accepted.length) { $('video-moment-feedback').textContent = '请选择 JPG、PNG 或 WebP 格式的照片。'; return; }
+  $('video-add-photos').disabled = true; $('video-moment-feedback').className = 'form-feedback'; $('video-moment-feedback').textContent = '正在压缩照片以便本机测试…';
+  try {
+    for (const file of accepted) state.videoPhotos.push(await shrinkPhoto(file));
+    state.videoPhotos.forEach((photo, index) => { photo.photoId = `photo-${index + 1}`; });
+    $('video-moment-feedback').textContent = files.length > accepted.length ? '已达到最多20张；其余照片没有加入。' : '';
+  } catch (error) { $('video-moment-feedback').textContent = error instanceof Error ? error.message : '照片暂时无法读取，请换一张再试。'; }
+  finally { $('video-add-photos').disabled = false; refreshVideoMoment(); }
+});
+$('video-authorize').addEventListener('change', refreshVideoMoment);
+$('video-submit').addEventListener('click', () => safely(async () => {
+  const button = $('video-submit'); button.disabled = true; $('video-moment-feedback').className = 'form-feedback'; $('video-moment-feedback').textContent = '正在把授权素材交给“悦见时刻”测试…';
+  try {
+    const result = await api('/api/customer/video-moments', 'POST', { authorized: true, photos: state.videoPhotos.map(({ byteSize, ...photo }) => photo) });
+    $('video-moment-feedback').classList.add('success');
+    $('video-moment-feedback').textContent = `${result.message} 已接收 ${result.photoCount} 张，目标约 ${result.requestedDurationSeconds} 秒。`;
+  } catch {
+    $('video-moment-feedback').classList.add('error'); $('video-moment-feedback').textContent = '素材没有提交成功，请确认已选择5至20张、总大小不超过12MB的照片。';
+  } finally { refreshVideoMoment(); }
+}));
 async function sessions() {
   const { items } = await api('/api/customer/sessions');
   if (!items.some(s => s.sessionId === state.sessionId)) state.sessionId = items.at(-1)?.sessionId ?? '';

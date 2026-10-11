@@ -69,6 +69,20 @@ test('customer identity is bound server-side and cannot read/write another brows
   assert.equal((await f.request(`/api/customer/messages/${result.messageId}/feedback`, 'POST', { type: 'helpful' }, b.headers)).status, 404);
 });
 
+test('customer can submit explicitly authorised photo inputs to the video-moment test skill', async t => {
+  const f = await fixture(t); const customer = await f.customer();
+  const photos = Array.from({ length: 5 }, (_, index) => ({ photoId: `photo-${index + 1}`, originalName: `day-${index + 1}.jpg`,
+    mediaType: 'image/jpeg', capturedAt: `2026-10-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`, dataBase64: '/9j/2Q==' }));
+  const created = await f.request('/api/customer/video-moments', 'POST', { authorized: true, photos }, customer.headers);
+  assert.equal(created.status, 201);
+  assert.equal(created.body.skillId, 'skincare-moment-video');
+  assert.equal(created.body.status, 'not_configured');
+  assert.equal(created.body.photoCount, 5);
+  assert.match(created.body.message, /尚未生成视频文件/);
+  const rejected = await f.request('/api/customer/video-moments', 'POST', { authorized: false, photos }, customer.headers);
+  assert.equal(rejected.status, 422);
+});
+
 test('cookie writes require CSRF, cross-origin calls fail, operator logout revokes access', async t => {
   const f = await fixture(t); const customer = await f.customer(); const op = await loginOperator(f.base);
   assert.equal((await f.request('/api/customer/card', 'PATCH', { expectedVersion: 0, preferences: ['x'] }, { Cookie: customer.headers.Cookie })).status, 403);

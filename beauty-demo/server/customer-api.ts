@@ -5,6 +5,7 @@ import { Store } from './storage/store.js';
 import { CustomerService } from './core/customer-service.js';
 import { createSessionSchema, idSchema } from './contracts/index.js';
 import type { ConsultResult } from './core/workflow-types.js';
+import { VideoMomentService, videoMomentDataRoot, videoMomentRequestSchema } from './core/video-moment.js';
 
 const friendlyFailure = '当前智能客服暂时无法完成回复。您的消息已保存，可以稍后重试或请求人工。';
 function sessionTopic(text: string) {
@@ -28,6 +29,7 @@ export function publicResult(result: ConsultResult | null, service?: CustomerSer
     message: ({ answered: '已完成回复', clarification_required: '需要补充信息', degraded: '智能服务暂不可用', handoff_pending: '正在等待人工', human_active: '人工已接入', resolved: '本次服务已结束', cancelled: '已停止处理', interrupted: '处理已中止' })[result.status] };
 }
 export function mountCustomerApi(app: Express, store: Store, service: CustomerService, access: AccessControl) {
+  const videoMoments = new VideoMomentService(videoMomentDataRoot(store.path));
   app.use('/api/customer', (req, res, next) => {
     try { res.locals.customerUserId = access.requireCustomer(req).userId; next(); } catch (error) { next(error); }
   });
@@ -37,6 +39,10 @@ export function mountCustomerApi(app: Express, store: Store, service: CustomerSe
   }));
   app.get('/api/customer/card', (_req, res) => res.json(store.getCard(res.locals.customerUserId)));
   app.patch('/api/customer/card', (req, res) => res.json(store.updateCard(res.locals.customerUserId, req.body)));
+  app.post('/api/customer/video-moments', async (req, res) => {
+    const result = await videoMoments.create(res.locals.customerUserId, videoMomentRequestSchema.parse(req.body));
+    res.status(201).json(result);
+  });
   app.get('/api/customer/sessions', (_req, res) => res.json({ items: store.listSessions(res.locals.customerUserId).map((session: any) => {
     const { userId: _userId, firstUserMessage, latestUserMessage, ...publicSession } = session;
     return { ...publicSession, topic: sessionTopic(firstUserMessage ?? ''), summary: sessionSummary(firstUserMessage),
