@@ -36,6 +36,27 @@ test('HTTP 401 and cancelled requests never trigger an automatic retry', async (
   assert.equal(attempts, 1);
 });
 
+test('HTTP 404 retains only an allowlisted vendor code, never the upstream message or arbitrary body', async () => {
+  let calls = 0;
+  const request = (payload: string) => providerJson('https://api.example.test/v1', 'test-key', {}, new AbortController().signal, 3000,
+    async () => { calls++; return new Response(payload, { status: 404 }); });
+  await assert.rejects(request(JSON.stringify({ error: { code: 'InvalidEndpoint.NotFound', message: 'private image or key' } })), error => {
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.code, 'PROVIDER_HTTP_404');
+    assert.deepEqual(error.details, { host: 'api.example.test', networkCode: null, attempts: 1,
+      providerCode: 'InvalidEndpoint.NotFound' });
+    assert.ok(!JSON.stringify(error).includes('private image or key'));
+    return true;
+  });
+  await assert.rejects(request(JSON.stringify({ error: { code: 'private secret data', message: 'do not emit' } })), error => {
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.details?.providerCode, undefined);
+    assert.ok(!JSON.stringify(error).includes('do not emit'));
+    return true;
+  });
+  assert.equal(calls, 2);
+});
+
 test('network code extraction is bounded and rejects arbitrary messages', () => {
   assert.equal(networkErrorCode({ cause: { errors: [{ code: 'ECONNREFUSED' }] } }), 'ECONNREFUSED');
   assert.equal(networkErrorCode({ code: 'secret-key-value', message: 'do not emit' }), null);

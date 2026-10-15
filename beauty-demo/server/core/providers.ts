@@ -3,7 +3,7 @@ import type { BusinessConfig, DecisionInput, DecisionProvider, GenerationProvide
 import { baseRoute } from './registry.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export interface ProviderDetails { host: string; networkCode: string | null; attempts: number }
+export interface ProviderDetails { host: string; networkCode: string | null; attempts: number; providerCode?: string }
 export class ProviderError extends Error {
   constructor(public code: string, public details?: ProviderDetails) { super(code); }
 }
@@ -15,6 +15,29 @@ export function networkErrorCode(error: unknown): string | null {
     current = value.cause ?? value.errors?.[0];
   }
   return null;
+}
+/** Never expose the upstream message/body: it may contain customer data or credentials. */
+async function safeProviderCode(response: Response): Promise<string | undefined> {
+  if (!response.body) return undefined;
+  const reader = response.body.getReader();
+  const parts: Uint8Array[] = []; let length = 0;
+  try {
+    while (length <= 4096) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > 4096) return undefined;
+      parts.push(value);
+    }
+    const body = JSON.parse(Buffer.concat(parts).toString('utf8')) as { error?: { code?: unknown } };
+    const code = body?.error?.code;
+    // Deliberately narrow allowlist; unknown codes and all provider messages stay private.
+    return typeof code === 'string' && new Set([
+      'InvalidEndpoint.NotFound', 'ModelNotFound', 'AccessDenied', 'InvalidApiKey', 'InvalidParameter',
+      'AuthenticationError', 'QuotaExceeded',
+    ]).has(code) ? code : undefined;
+  } catch { return undefined; }
+  finally { await reader.cancel().catch(() => {}); }
 }
 export async function providerJson(url: string, key: string, body: unknown, signal: AbortSignal, timeoutMs: number, fetchImpl = fetch): Promise<unknown> {
   if (!key.trim()) throw new ProviderError('PROVIDER_NOT_CONFIGURED');
@@ -32,7 +55,11 @@ export async function providerJson(url: string, key: string, body: unknown, sign
         headers: { Authorization: `Bearer ${key.trim()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       receivedResponse = true;
-      if (!response.ok) throw new ProviderError(`PROVIDER_HTTP_${response.status}`, { host, networkCode: null, attempts });
+      if (!response.ok) {
+        const providerCode = await safeProviderCode(response);
+        throw new ProviderError(`PROVIDER_HTTP_${response.status}`, { host, networkCode: null, attempts,
+          ...(providerCode ? { providerCode } : {}) });
+      }
       try { return await response.json(); } catch (error) {
         if (combined.aborted) throw error;
         throw new ProviderError('PROVIDER_INVALID_JSON', { host, networkCode: null, attempts });

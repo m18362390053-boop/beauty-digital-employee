@@ -219,6 +219,7 @@ async function openPage(name) {
   if (state.page === 'dashboard') await loadDashboard();
   if (state.page === 'setup') await loadSetup();
   if (state.page === 'runs') await loadRuns();
+  if (state.page === 'care') await loadCareEvents();
 }
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => guarded(() => openPage(button.dataset.page))));
 
@@ -260,6 +261,7 @@ async function loadSetup() {
     const versionBox = node('div'); const preview = node('pre'); preview.hidden = true; box.append(versionBox, preview);
     list.append(box);
   }
+  await loadCarePlans();
 }
 $('refresh-setup').addEventListener('click', () => guarded(loadSetup));
 $('initialize-demo').addEventListener('click', () => guarded(async () => {
@@ -314,6 +316,20 @@ $('product-upload-form').addEventListener('submit', event => {
     notify(`产品 ${result.productId} ${result.version} 已导入；刷新网页读取新资料。`);
   });
 });
+$('care-plan-upload-form').addEventListener('submit', event => {
+  event.preventDefault(); guarded(async () => {
+    const file = $('care-plan-file').files[0]; if (!file) return;
+    if (file.size > 100_000) throw new Error('计划JSON最大100KB。');
+    const result = await api('/api/ops/care-plans', 'POST', JSON.parse(await file.text()));
+    notify(`计划 ${result.planId} ${result.version} ${result.status === 'unchanged' ? '已有相同版本' : '已导入'}；用户页刷新后可选择。`);
+    await loadCarePlans();
+  });
+});
+async function loadCarePlans() {
+  const { items } = await api('/api/ops/care-plans'); const box = $('care-plan-list'); box.replaceChildren();
+  if (!items.length) { box.append(node('p', '尚无正式商品的已审核计划；目前仅可使用虚构演示流程。', 'muted')); return; }
+  for (const plan of items) box.append(node('p', `${plan.planId} / ${plan.version} · ${plan.period === 'morning' ? '早间' : '晚间'} · ${plan.steps.map(step => `${step.productId} (${step.productVersion})`).join(' → ')} · 审核：${plan.reviewedBy}`, 'small'));
+}
 async function boot() {
   try { state.pending = JSON.parse(sessionStorage.getItem('beauty-pending') ?? 'null'); } catch { setPending(null); }
   const [health, status, users, products] = await Promise.all([api('/health'), api('/api/status'), api('/api/users'), api('/api/products')]);
@@ -338,6 +354,25 @@ async function loadRuns() {
   for (const run of items) { const option = node('option', `${run.createdAt} · ${run.userName} · ${run.status} · ${run.input.slice(0, 40)}`); option.value = run.runId; $('run-select').append(option); }
   if (items.some(run => run.runId === previous)) $('run-select').value = previous;
   if ($('run-select').value) await loadRunDetail($('run-select').value); else $('run-detail').replaceChildren(node('p', '暂无执行记录。'));
+}
+async function loadCareEvents() {
+  const actions = await api('/api/ops/routine-actions'); const actionBox = $('ops-routine-actions'); actionBox.replaceChildren();
+  if (!actions.items.length) actionBox.append(node('p', '尚无护理步骤操作。', 'muted'));
+  for (const item of actions.items) actionBox.append(node('p', `${item.createdAt} · ${item.userId} · 第 ${item.expectedStep + 1} 步 · ${item.action} / ${item.source} · ${item.nextStatus} · 操作 ${item.requestId}${item.eventId ? ` · 完成事件 ${item.eventId}` : ''}`, 'small'));
+  const modality = await api('/api/ops/modality-events'); const logs = $('ops-modality-events'); logs.replaceChildren();
+  if (!modality.items.length) logs.append(node('p', '尚无多模态请求记录。', 'muted'));
+  for (const item of modality.items) logs.append(node('p', `${item.createdAt} · ${item.userId} · ${item.modality} / ${item.provider} · ${item.status}${item.code ? ` (${item.code})` : ''} · ${item.eventId}`, 'small'));
+  const { items } = await api('/api/ops/care-events'); const box = $('ops-care-events'); box.replaceChildren();
+  if (!items.length) { box.append(node('p', '目前没有用户确认过的护理步骤。', 'muted')); return; }
+  for (const item of items) {
+    const panel = node('article', undefined, 'panel');
+    panel.append(node('h3', `${item.userId} · ${item.step.productName} · 第 ${item.stepIndex + 1} 步`),
+      node('p', `${item.period === 'morning' ? '早间' : '晚间'} · ${item.createdAt} · ${item.voidedAt ? '已撤销' : '已确认'} · ${item.source}`, 'small muted'),
+      node('p', item.step.instruction), node('p', `来源：${item.step.sourceTitle} / ${item.step.sourceId} · 产品版本 ${item.step.productVersion}`, 'small muted'),
+      node('p', `护理流程 ${item.routineId} · 完成事件 ${item.eventId}`, 'small muted'));
+    if (item.feeling) panel.append(node('p', `本人感受：${item.feeling}`));
+    box.append(panel);
+  }
 }
 async function loadRunDetail(id) {
   if (!id) return;
@@ -388,6 +423,7 @@ $('download-route-json').addEventListener('click', event => {
   notify(`已下载调试记录 ${state.lastResult.runId}.json`);
 });
 $('refresh-runs').addEventListener('click', () => guarded(loadRuns));
+$('refresh-care-events').addEventListener('click', () => guarded(loadCareEvents));
 $('load-run').addEventListener('click', () => guarded(() => loadRunDetail($('run-select').value)));
 $('operator-login-form').addEventListener('submit', event => {
   event.preventDefault();

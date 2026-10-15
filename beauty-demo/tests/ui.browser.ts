@@ -14,6 +14,9 @@ import { ModelSettings } from '../server/core/model-settings.js';
 import { JevProvider, ChatProvider } from '../server/core/providers.js';
 import { SkillPackages } from '../server/core/skill-packages.js';
 import { FACE_GUIDE_SKILL_ID } from '../server/core/face-guides.js';
+import { ProductVision } from '../server/core/product-vision.js';
+import { SpeechService } from '../server/core/speech.js';
+import { VolcanoSettings } from '../server/core/volcano.js';
 import { testAccess, testOperatorPassword } from './access-helper.js';
 
 const executablePath = process.env.BROWSER_PATH ?? [
@@ -214,7 +217,11 @@ test('browser: separate customer/operator contexts share a real handoff without 
     const customer = await customerContext.newPage(); const operator = await opsContext.newPage();
     customer.setDefaultTimeout(10_000); operator.setDefaultTimeout(10_000);
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    const errors: string[] = []; customer.on('pageerror', error => errors.push(error.message)); operator.on('pageerror', error => errors.push(error.message));
+    const errors: string[] = []; const missingAssets: string[] = [];
+    customer.on('pageerror', error => errors.push(error.message)); operator.on('pageerror', error => errors.push(error.message));
+    customer.on('response', response => {
+      if (response.status() === 404 && new URL(response.url()).pathname.startsWith('/chat/')) missingAssets.push(response.url());
+    });
     await customer.goto(base + '/'); await customer.locator('#service-status').getByText('欢迎咨询').waitFor();
     assert.equal(await customer.locator('#home-view').isVisible(), true);
     assert.equal(await customer.locator('#consult-view').isVisible(), false);
@@ -243,6 +250,7 @@ test('browser: separate customer/operator contexts share a real handoff without 
     assert.deepEqual(store.getCard(id).preferences, ['喜欢清爽']);
     await customer.reload(); await customer.getByText('您好，我是本次演示坐席。', { exact: true }).waitFor();
     assert.deepEqual(errors, []);
+    assert.deepEqual(missingAssets, []);
     await mkdir(resolve('test-results'), { recursive: true });
     await customer.screenshot({ path: resolve('test-results/customer-ui.png'), fullPage: true });
     await operator.getByRole('button', { name: '执行记录', exact: true }).click();
@@ -343,6 +351,148 @@ test('browser: face-area diagram shows a pausable under-eye highlight with separ
       await page.locator(`.face-guide[data-region="${region}"]`).waitFor();
       await page.locator(`.face-guide[data-region="${region}"]`).screenshot({ path: resolve(`test-results/${screenshot}`) });
     }
+  } finally {
+    await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
+    store.close(); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('browser: a customer confirms a product, completes one step, skips another and corrects a record', {
+  timeout: 45_000, skip: !executablePath && 'Set BROWSER_PATH',
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'beauty-care-ui-')); const store = new Store(join(dir, 'ui.sqlite'));
+  for (const product of JSON.parse(await readFile(resolve('content/templates/routine.demo.json'), 'utf8'))) store.importProduct(product);
+  const server = createApp(store, undefined, { access: testAccess(store) }).listen(0, '127.0.0.1');
+  await new Promise<void>(r => server.once('listening', r));
+  const browser = await chromium.launch({ executablePath, headless: true, timeout: 20_000 });
+  try {
+    const page = await browser.newPage(); page.setDefaultTimeout(8_000);
+    const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/chat/`);
+    await page.getByRole('button', { name: '开始咨询' }).click();
+    await page.locator('#care-products option').first().waitFor();
+    await page.locator('#package-text').fill('我手里有虚构演示洁面和虚构演示面霜');
+    await page.locator('#find-care-products').click();
+    await page.getByText('找到 2 个文字匹配候选', { exact: false }).waitFor();
+    await page.locator('#start-care').click();
+    await page.locator('.care-step').getByText('第 1 / 2 步', { exact: false }).waitFor();
+    await page.getByRole('button', { name: '重说', exact: true }).click();
+    assert.equal(await page.locator('.care-step').count(), 1);
+    await page.getByRole('button', { name: '好了，完成这一步' }).click();
+    await page.locator('.care-step').getByText('第 2 / 2 步', { exact: false }).waitFor();
+    const operator = await browser.newPage();
+    await operatorLogin(operator, `http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+    await operator.getByRole('button', { name: '护理记录', exact: true }).click();
+    await operator.getByText('来源：虚构护肤流程演示资料：洁面', { exact: false }).waitFor();
+    await page.getByRole('button', { name: '跳过（不记录完成）' }).click();
+    await page.getByText('本次流程已结束。只有确认过的步骤才会留下完成记录。').waitFor();
+    assert.equal(await page.locator('.care-event').count(), 1);
+    page.once('dialog', dialog => void dialog.accept());
+    await page.getByRole('button', { name: '删除误记' }).click();
+    await page.getByText('还没有已确认的护理记录。').waitFor();
+    await operator.getByRole('button', { name: '刷新护理记录' }).click();
+    await operator.getByText('已撤销', { exact: false }).waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
+    store.close(); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('browser: authorised product photo yields an unconfirmed candidate that the customer can bind to a new consultation', {
+  timeout: 45_000, skip: !executablePath && 'Set BROWSER_PATH',
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'beauty-vision-ui-')); const store = new Store(join(dir, 'ui.sqlite'));
+  const [cleanser] = JSON.parse(await readFile(resolve('content/templates/routine.demo.json'), 'utf8'));
+  store.importProduct(cleanser);
+  const modelSettings = new ModelSettings(undefined, {
+    CHAT_API_KEY: 'test-only-no-external-call', CHAT_MODEL: 'deepseek-flash', CHAT_BASE_URL: 'https://api.deepseek.com/v1',
+  });
+  const service = new CustomerService(store, { modelSettings });
+  const vision = new ProductVision(store, modelSettings, async () => Response.json({ model: 'browser-test-vision',
+    choices: [{ message: { content: JSON.stringify({ visibleName: '', visibleSpecification: '',
+      visibleBarcode: '', visibleText: '虚构演示洁面 <script>not html</script>', legible: true }) } }] }));
+  const server = createApp(store, service, { access: testAccess(store), vision }).listen(0, '127.0.0.1');
+  await new Promise<void>(r => server.once('listening', r));
+  const browser = await chromium.launch({ executablePath, headless: true, timeout: 20_000 });
+  try {
+    const page = await browser.newPage(); page.setDefaultTimeout(8_000);
+    await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/chat/`);
+    await page.getByRole('button', { name: '开始咨询' }).click();
+    await page.locator('#care-photo-status').getByText('已配置但尚未验证效果', { exact: false }).waitFor();
+    await page.locator('#care-photo').setInputFiles(resolve('web/customer/assets/essence-for.png'));
+    await page.locator('#care-photo-preview').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#recognize-care-photo').isDisabled(), true);
+    await page.locator('#care-photo-authorize').check();
+    const response = page.waitForResponse(r => r.url().endsWith('/api/customer/packaging/recognize'));
+    await page.locator('#recognize-care-photo').click();
+    assert.equal((await response).status(), 200);
+    await page.getByText('模型读到的其他文字（未经商品审核）：虚构演示洁面 <script>not html</script>').waitFor();
+    assert.equal(await page.locator('#care-photo-candidates script').count(), 0);
+    await page.getByRole('button', { name: /我确认是 虚构演示洁面/ }).waitFor();
+    assert.equal(store.listUsers().length, 1);
+    await page.getByRole('button', { name: /我确认是 虚构演示洁面/ }).click();
+    assert.equal(await page.locator('#product-select').inputValue(), 'demo-gentle-cleanser');
+    await page.getByText('已用你确认的 虚构演示洁面 开始新咨询', { exact: false }).waitFor();
+    const userId = (store.listUsers()[0] as { userId: string }).userId;
+    assert.equal((store.listSessions(userId)[0] as { productId: string }).productId, 'demo-gentle-cleanser');
+  } finally {
+    await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
+    store.close(); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('browser: configured speech offers reviewed draft and step narration; playback failure keeps written instruction', {
+  timeout: 45_000, skip: !executablePath && 'Set BROWSER_PATH',
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'beauty-speech-ui-')); const store = new Store(join(dir, 'ui.sqlite'));
+  const [product] = JSON.parse(await readFile(resolve('content/templates/routine.demo.json'), 'utf8'));
+  store.importProduct(product);
+  const speech = new SpeechService(new VolcanoSettings({ VOLC_ARK_API_KEY: 'only-mock', VOLC_ASR_MODEL: 'test-audio',
+    VOLC_VOICE_API_KEY: 'only-mock', VOLC_TTS_SPEAKER: 'mock-speaker' }), async (url, options) => {
+    if (String(url).endsWith('/responses')) {
+      const request = JSON.parse(String(options?.body));
+      assert.match(request.input[0].content[0].audio_url, /^data:audio\/wav;base64,/);
+      return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: '好了' }] }] });
+    }
+    return new Response(`{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}\n`);
+  });
+  const server = createApp(store, undefined, { access: testAccess(store), speech }).listen(0, '127.0.0.1');
+  await new Promise<void>(r => server.once('listening', r));
+  const browser = await chromium.launch({ executablePath, headless: true, timeout: 20_000 });
+  try {
+    const page = await browser.newPage(); page.setDefaultTimeout(8_000);
+    const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/chat/`);
+    await page.getByRole('button', { name: '开始咨询' }).click();
+    await page.locator('#record-consult').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#record-consult').isDisabled(), false);
+    assert.equal(await page.locator('#speak-care').isDisabled(), true);
+    await page.locator('#care-products option').first().waitFor();
+    await page.locator('#care-products').selectOption(['demo-gentle-cleanser']);
+    await page.locator('#start-care').click();
+    await page.locator('.care-step').getByText('第 1 / 1 步', { exact: false }).waitFor();
+    const response = page.waitForResponse(result => result.url().endsWith('/api/customer/speech/synthesize'));
+    await page.locator('#speak-care').click(); assert.equal((await response).status(), 200);
+    await page.getByText('暂时无法朗读，请阅读屏幕上的步骤文字。').waitFor();
+    assert.match(await page.locator('.care-step').textContent() ?? '', /虚构演示洁面/);
+    assert.equal(store.db.prepare('SELECT count(*) AS count FROM care_events').get()?.count, 0);
+    await page.evaluate(() => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const context = new AudioContext(); const output = context.createMediaStreamDestination();
+        const tone = context.createOscillator(); tone.connect(output); tone.start();
+        return output.stream;
+      };
+    });
+    await page.locator('#record-care').click();
+    await page.locator('#stop-recording').waitFor({ state: 'visible' });
+    await page.waitForTimeout(700); // Give MediaRecorder enough audio frames to create a decodable WebM recording.
+    const transcribed = page.waitForResponse(result => result.url().endsWith('/api/customer/speech/transcribe'));
+    await page.locator('#stop-recording').click(); assert.equal((await transcribed).status(), 200);
+    await page.getByText('转写已填入草稿；核对无误后请手动点击发送。').waitFor();
+    assert.equal(await page.locator('#care-command').inputValue(), '好了');
+    assert.equal(store.db.prepare('SELECT count(*) AS count FROM care_events').get()?.count, 0);
+    assert.deepEqual(errors, []);
   } finally {
     await browser.close(); await new Promise<void>(r => { server.close(() => r()); server.closeIdleConnections(); });
     store.close(); await rm(dir, { recursive: true, force: true });

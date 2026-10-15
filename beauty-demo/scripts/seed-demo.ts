@@ -13,6 +13,7 @@ try {
   }
   console.log(store.importProduct(await load('product.demo.json')));
   for (const product of await load('catalog.demo.json')) console.log(store.importProduct(product));
+  for (const product of await load('routine.demo.json')) console.log(store.importProduct(product));
   console.log(store.importComments(await load('comments.demo.json')));
   const users = store.listUsers();
   for (const userId of ['demo-user-a', 'demo-user-b']) {

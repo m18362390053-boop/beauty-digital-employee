@@ -1,6 +1,7 @@
 # Local API credentials; never part of the team handoff.
 typesafe_apikey.txt
 deepseek_api.txt
+doubao_api.txt
 **/*apikey*.txt
 **/*api_key*.txt
 **/.env

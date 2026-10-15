@@ -6,6 +6,12 @@ import { CustomerService } from './core/customer-service.js';
 import { createSessionSchema, idSchema } from './contracts/index.js';
 import type { ConsultResult } from './core/workflow-types.js';
 import { VideoMomentService, videoMomentDataRoot, videoMomentRequestSchema } from './core/video-moment.js';
+import { Routines } from './core/routines.js';
+import { AppError } from './core/errors.js';
+import { ProductVision } from './core/product-vision.js';
+import { ProviderError } from './core/providers.js';
+import { SpeechService } from './core/speech.js';
+import { randomUUID } from 'node:crypto';
 
 const friendlyFailure = '当前智能客服暂时无法完成回复。您的消息已保存，可以稍后重试或请求人工。';
 function sessionTopic(text: string) {
@@ -28,8 +34,14 @@ export function publicResult(result: ConsultResult | null, service?: CustomerSer
     visualGuide: result.visualGuide ?? null,
     message: ({ answered: '已完成回复', clarification_required: '需要补充信息', degraded: '智能服务暂不可用', handoff_pending: '正在等待人工', human_active: '人工已接入', resolved: '本次服务已结束', cancelled: '已停止处理', interrupted: '处理已中止' })[result.status] };
 }
-export function mountCustomerApi(app: Express, store: Store, service: CustomerService, access: AccessControl) {
+export function mountCustomerApi(app: Express, store: Store, service: CustomerService, access: AccessControl,
+  routines = new Routines(store), vision = new ProductVision(store, service.modelSettings), speech = new SpeechService()) {
   const videoMoments = new VideoMomentService(videoMomentDataRoot(store.path));
+  const audit = (userId: string, modality: 'image' | 'asr' | 'tts', provider: string, status: 'succeeded' | 'failed', error?: unknown) => {
+    const code = error instanceof AppError || error instanceof ProviderError ? error.code : error ? 'UPSTREAM_FAILURE' : null;
+    store.db.prepare(`INSERT INTO modality_events(id,user_id,modality,provider,status,code,created_at) VALUES(?,?,?,?,?,?,?)`)
+      .run(randomUUID(), userId, modality, provider, status, code, new Date().toISOString());
+  };
   app.use('/api/customer', (req, res, next) => {
     try { res.locals.customerUserId = access.requireCustomer(req).userId; next(); } catch (error) { next(error); }
   });
@@ -39,10 +51,83 @@ export function mountCustomerApi(app: Express, store: Store, service: CustomerSe
   }));
   app.get('/api/customer/card', (_req, res) => res.json(store.getCard(res.locals.customerUserId)));
   app.patch('/api/customer/card', (req, res) => res.json(store.updateCard(res.locals.customerUserId, req.body)));
+  app.get('/api/customer/input/capabilities', (_req, res) => res.json({
+    typedText: 'available', packagingTextMatch: 'available', screenButtons: 'available',
+    asr: speech.settings.asrReady() ? 'configured_unverified' : 'not_configured',
+    tts: speech.settings.ttsReady() ? 'configured_unverified' : 'not_configured',
+    imageRecognition: vision.configured() ? 'configured_unverified' : 'not_configured',
+    imageProvider: vision.provider(),
+  }));
+  app.post('/api/customer/speech/transcribe', async (req, res) => {
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); }; res.on('close', close);
+    try { const result = await speech.transcribe(req.body, abort.signal); audit(res.locals.customerUserId, 'asr', 'volcano_ark', 'succeeded'); res.json(result); }
+    catch (error) { if (error instanceof ProviderError || error instanceof AppError) audit(res.locals.customerUserId, 'asr', 'volcano_ark', 'failed', error);
+      if (!(error instanceof ProviderError)) throw error;
+      throw new AppError(503, error.code, '转写服务暂不可用；没有执行任何指令。');
+    } finally { res.off('close', close); }
+  });
+  app.post('/api/customer/speech/synthesize', async (req, res) => {
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); }; res.on('close', close);
+    try {
+      const source = z.object({ authorized: z.literal(true), messageId: idSchema.optional(), routineId: idSchema.optional() }).strict()
+        .refine(value => Number(Boolean(value.messageId)) + Number(Boolean(value.routineId)) === 1, 'Choose one owned text source').parse(req.body);
+      let text: string;
+      if (source.routineId) {
+        const run = routines.get(res.locals.customerUserId, source.routineId);
+        if (run.status !== 'active' || !run.current) throw new AppError(409, 'ROUTINE_NOT_ACTIVE', '没有可朗读的当前步骤。');
+        text = run.current.instruction;
+      } else {
+        const row = store.db.prepare(`SELECT m.role,m.content,m.metadata FROM messages m
+          JOIN sessions s ON s.id=m.session_id WHERE m.id=? AND s.user_id=?`)
+          .get(source.messageId!, res.locals.customerUserId) as { role: string; content: string; metadata: string } | undefined;
+        if (!row || !['assistant', 'human'].includes(row.role)
+          || ['degraded', 'cancelled', 'interrupted'].includes((JSON.parse(row.metadata) as { status?: string }).status ?? '')) {
+          throw new AppError(404, 'SPEAK_SOURCE_NOT_FOUND', '没有可朗读的本人回复。');
+        }
+        text = row.content;
+      }
+      const result = await speech.synthesize({ authorized: true, text }, abort.signal);
+      audit(res.locals.customerUserId, 'tts', 'doubao_voice', 'succeeded'); res.json(result);
+    }
+    catch (error) { if (error instanceof ProviderError || error instanceof AppError) audit(res.locals.customerUserId, 'tts', 'doubao_voice', 'failed', error);
+      if (!(error instanceof ProviderError)) throw error;
+      throw new AppError(503, error.code, '播报服务暂不可用，请阅读页面文字。');
+    } finally { res.off('close', close); }
+  });
+  app.post('/api/customer/packaging/candidates', (req, res) => res.json(routines.candidates(req.body)));
+  app.post('/api/customer/packaging/recognize', async (req, res) => {
+    const abort = new AbortController();
+    const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { const provider = vision.provider() ?? 'not_configured'; const result = await vision.recognize(req.body, abort.signal);
+      audit(res.locals.customerUserId, 'image', provider, 'succeeded'); res.json(result); }
+    catch (error) {
+      if (error instanceof ProviderError || error instanceof AppError) audit(res.locals.customerUserId, 'image', vision.provider() ?? 'not_configured', 'failed', error);
+      if (!(error instanceof ProviderError)) throw error;
+      throw new AppError(503, error.code, '图片识别服务暂不可用，未确认任何产品。请稍后重试或改用文字输入。');
+    } finally { res.off('close', close); }
+  });
+  app.get('/api/customer/routines/products', (_req, res) => res.json({ items: routines.eligibleProducts() }));
+  app.get('/api/customer/routines/current', (_req, res) => res.json({ routine: routines.current(res.locals.customerUserId) }));
+  app.post('/api/customer/routines', (req, res) => res.status(201).json(routines.start(res.locals.customerUserId, req.body)));
+  app.get('/api/customer/routines/:routineId', (req, res) =>
+    res.json(routines.get(res.locals.customerUserId, idSchema.parse(req.params.routineId))));
+  app.post('/api/customer/routines/:routineId/actions', (req, res) => {
+    if (req.body?.source === 'device_button') throw new AppError(403, 'DEVICE_SOURCE_REQUIRED', '设备按钮只接受设备连接凭据。');
+    res.json(routines.act(res.locals.customerUserId, idSchema.parse(req.params.routineId), req.body));
+  });
+  app.post('/api/customer/routines/:routineId/text-commands', (req, res) =>
+    res.json(routines.typedCommand(res.locals.customerUserId, idSchema.parse(req.params.routineId), req.body)));
+  app.get('/api/customer/care-events', (_req, res) => res.json({ items: routines.events(res.locals.customerUserId) }));
+  app.delete('/api/customer/care-events/:eventId', (req, res) =>
+    res.json(routines.voidEvent(res.locals.customerUserId, idSchema.parse(req.params.eventId))));
   app.post('/api/customer/video-moments', async (req, res) => {
     const result = await videoMoments.create(res.locals.customerUserId, videoMomentRequestSchema.parse(req.body));
     res.status(201).json(result);
   });
+  app.get('/api/customer/video-moments', async (_req, res) => res.json(await videoMoments.list(res.locals.customerUserId)));
+  app.delete('/api/customer/video-moments/:jobId', async (req, res) =>
+    res.json(await videoMoments.delete(res.locals.customerUserId, req.params.jobId)));
   app.get('/api/customer/sessions', (_req, res) => res.json({ items: store.listSessions(res.locals.customerUserId).map((session: any) => {
     const { userId: _userId, firstUserMessage, latestUserMessage, ...publicSession } = session;
     return { ...publicSession, topic: sessionTopic(firstUserMessage ?? ''), summary: sessionSummary(firstUserMessage),

@@ -26,6 +26,7 @@
     <button data-page="dashboard">风险看板</button>
     <button data-page="setup">业务配置 · Skill上传</button>
     <button data-page="runs">执行记录</button>
+    <button data-page="care">护理记录</button>
   </nav>
   <div id="notification" role="status" aria-live="polite"></div>
   <div id="setup-warning" class="notice" hidden></div>
@@ -116,11 +117,20 @@
       <article class="panel"><h2>4 · 产品知识文件</h2><p class="small muted">上传符合product.demo.json格式的JSON，可新增当前产品版本。初期也可把知识写入Skill ZIP的knowledge目录。</p>
         <form id="product-upload-form"><label for="product-file">产品知识 JSON</label><input id="product-file" type="file" accept=".json" required><button class="primary">导入产品知识</button></form>
       </article>
+      <article class="panel"><h2>5 · 正式护理计划（须 B/D 审核）</h2><p class="small muted">先导入正式商品的已审核用法，再导入同版本、同早晚时段、明确顺序且附审核来源的计划。提交计划表示审核人已核验，不能把 Skill 引用当 SKU 审核。</p>
+        <form id="care-plan-upload-form"><label for="care-plan-file">已审核计划 JSON</label><input id="care-plan-file" type="file" accept=".json" required><button class="primary">导入已核验计划</button></form><div id="care-plan-list"></div>
+      </article>
     </section>
     <section id="page-runs" class="page" hidden>
       <div class="toolbar"><div><h2>Agent 执行记录</h2><p class="muted">检查档案、决策、Skill版本、知识片段与真实动作；不展示模型内部思维链。</p></div><button id="refresh-runs">刷新记录</button></div>
       <div class="toolbar"><label class="grow">选择一次执行<select id="run-select"></select></label><button id="load-run">查看执行证据</button></div>
       <div id="run-detail"></div>
+    </section>
+    <section id="page-care" class="page" hidden>
+      <div class="toolbar"><div><h2>护理完成记录</h2><p class="muted">仅用户确认的步骤会有完成事件；跳过与重说不算完成。撤销的记录保留追溯标记。</p></div><button id="refresh-care-events">刷新护理记录</button></div>
+      <div id="ops-care-events"></div>
+      <article class="panel"><h3>护理动作时间线</h3><p class="small muted">包括确认、重说、跳过与停止；只有确认操作会关联完成事件。</p><div id="ops-routine-actions"></div></article>
+      <article class="panel"><h3>图片 / 转写 / 播报调用证据</h3><p class="small muted">仅记录服务商、成功/失败及错误码；不保存照片、音频或转写内容。未配置或测试替身不代表实物验收。</p><div id="ops-modality-events"></div></article>
     </section>
   </main>
   <footer>真实数据接口 · 演示资料明确标注 · Jev调度与回复模型分别配置</footer>

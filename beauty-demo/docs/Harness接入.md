@@ -1,5 +1,7 @@
 # 在 Harness 中调用客服数据与完整咨询
 
+> **多商品演示限制：**当前 `server/mcp/server.ts` 的 `get_context`（不带 sessionId）、`create_session`、`get_comments` 默认先检查产品总数**恰好为 1**。但 `seed:demo` 当前会导入基础演示产品和两款虚构口红；此时上述无会话工具可能返回 `PRODUCT_SETUP_REQUIRED`。有 sessionId 的 `get_context` 可按该会话读取产品。不要把下方“默认唯一产品”提示词当作现行多商品环境可直接运行的验收流程；改 MCP 契约前也不要静默选第一件商品。见 [文档导航](README.md)。
+
 ## 已接通的链路
 
 ```text
@@ -74,7 +76,7 @@ dsh --profile web --patch ./harness.patch.yml --host 127.0.0.1 --port 3002
 
 > 请实际调用 mcp__beauty__get_context 和 mcp__beauty__get_comments。告诉我当前绑定用户ID、数据卡版本、产品名称、已审核事实数量、评论总数，以及dataKind。请保留来源ID，并明确这些数据是真实还是虚构示例。不要模拟结果，也不要修改数据。
 
-预期：用户demo-user-a、演示产品、1条已审核事实、3条评论、dataKind=demo。
+仅在数据库确实只含一个产品时，预期可读到 `demo-user-a`、演示产品、1条已审核事实、3条评论、`dataKind=demo`。当前 `seed:demo` 会同时导入两款口红，该无会话请求会因产品不唯一返回 `PRODUCT_SETUP_REQUIRED`；可改为先从用户端建立会话，再通过带 `sessionId` 的 `get_context` 验证已绑定产品的知识。`get_comments` 仍需先解决产品选择契约。
 数据卡版本可能随之前修改而变化，不应硬编码为0。
 
 ### 2. 写入与跨会话验收

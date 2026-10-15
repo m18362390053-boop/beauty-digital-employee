@@ -11,6 +11,10 @@ import { SkillPackages } from './core/skill-packages.js';
 import { AccessControl } from './access.js';
 import { mountCustomerApi } from './customer-api.js';
 import { skillVersionSchema } from './core/workflow-types.js';
+import { Routines } from './core/routines.js';
+import { ProductVision } from './core/product-vision.js';
+import { SpeechService } from './core/speech.js';
+import { CarePlans } from './core/care-plans.js';
 
 const param = (req: Request, name: string) => idSchema.parse(req.params[name]);
 const pagination = z.object({
@@ -18,9 +22,10 @@ const pagination = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 }).strict();
 
-export function createApp(store: Store, service = new CustomerService(store), options: { access?: AccessControl } = {}) {
+export function createApp(store: Store, service = new CustomerService(store), options: { access?: AccessControl; vision?: ProductVision; speech?: SpeechService } = {}) {
   const app = express();
   const access = options.access ?? new AccessControl(store);
+  const routines = new Routines(store);
   app.disable('x-powered-by');
   if (process.env.BEAUTY_TRUST_PROXY === '1') app.set('trust proxy', 'loopback');
   app.use((_req, res, next) => {
@@ -62,12 +67,26 @@ export function createApp(store: Store, service = new CustomerService(store), op
     res.json(access.login(req, res, password));
   });
   app.post('/api/auth/operator/logout', (req, res) => { access.logout(req, res); res.json({ authenticated: false }); });
-  mountCustomerApi(app, store, service, access);
+  mountCustomerApi(app, store, service, access, routines, options.vision ?? new ProductVision(store, service.modelSettings), options.speech ?? new SpeechService());
+  // The gateway uses a user-bound, device-only token; never the operator password or model keys.
+  app.get('/api/device/routines/current', (req, res) => res.json({ routine: routines.current(access.requireDevice(req)) }));
+  app.post('/api/device/routines/:routineId/actions', (req, res) => {
+    const userId = access.requireDevice(req);
+    const value = z.object({ requestId: idSchema, expectedStep: z.number().int().nonnegative(),
+      action: z.enum(['confirm', 'repeat', 'skip', 'stop']), feeling: z.string().trim().max(200).optional() }).strict().parse(req.body);
+    res.json(routines.act(userId, idSchema.parse(req.params.routineId), { ...value, source: 'device_button' }));
+  });
   app.use('/api', access.guard);
   app.post('/api/ops/mcp-credentials', (req, res) => {
     const { userId } = z.object({ userId: idSchema }).strict().parse(req.body);
     res.json(access.issueMcp(userId));
   });
+  app.post('/api/ops/device-credentials', (req, res) => {
+    const { userId } = z.object({ userId: idSchema }).strict().parse(req.body);
+    res.json(access.issueDevice(userId));
+  });
+  app.delete('/api/ops/device-credentials/:userId', (req, res) =>
+    res.json(access.revokeDevices(param(req, 'userId'))));
   app.get('/api/status', (_req, res) => res.json(service.status()));
   app.post('/api/setup/demo', (_req, res) => {
     if (store.listProducts().some(p => p.dataKind !== 'demo')) {
@@ -76,11 +95,17 @@ export function createApp(store: Store, service = new CustomerService(store), op
     const load = (name: string) => JSON.parse(readFileSync(resolve('content/templates', name), 'utf8'));
     store.importProduct(load('product.demo.json'));
     for (const product of load('catalog.demo.json')) store.importProduct(product);
+    for (const product of load('routine.demo.json')) store.importProduct(product);
     store.importComments(load('comments.demo.json'));
     const users = store.listUsers();
     for (const userId of ['demo-user-a', 'demo-user-b']) if (!users.some(user => user.userId === userId)) store.createUser({ userId, displayName: `演示用户 ${userId.slice(-1).toUpperCase()}` });
     res.json({ status: 'ready', dataKind: 'demo' });
   });
+  app.get('/api/ops/care-plans', (_req, res) => res.json({ items: new CarePlans(store).list() }));
+  app.post('/api/ops/care-plans', (req, res) => res.status(201).json(new CarePlans(store).import(req.body)));
+  app.get('/api/ops/modality-events', (_req, res) => res.json({ items: store.db.prepare(`SELECT id AS eventId,user_id AS userId,
+    modality,provider,status,code,created_at AS createdAt FROM modality_events ORDER BY created_at DESC LIMIT 100`).all() }));
+  app.get('/api/ops/routine-actions', (_req, res) => res.json({ items: routines.operatorActions() }));
   app.get('/api/settings/models', (_req, res) => res.json(service.modelSettings.publicView()));
   app.put('/api/settings/models', (req, res) => res.json(service.configureModels(req.body)));
   app.post('/api/settings/models/check', async (_req, res) => res.json(await service.checkModels()));
@@ -156,6 +181,7 @@ export function createApp(store: Store, service = new CustomerService(store), op
   app.get('/api/dashboard', (_req, res) => res.json(service.workflows.dashboard()));
   app.get('/api/ops/runs', (_req, res) => res.json({ items: service.workflows.listRuns() }));
   app.get('/api/ops/runs/:runId', (req, res) => res.json(service.workflows.runDetail(param(req, 'runId'))));
+  app.get('/api/ops/care-events', (_req, res) => res.json({ items: routines.operatorTimeline() }));
   app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Endpoint not found')));
   const errors: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
     const traceId = res.locals.traceId as string;

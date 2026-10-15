@@ -351,11 +351,13 @@ test('v1 database upgrades without losing cards/messages, and interrupted jobs r
   const { store, dir, sessionId } = await fixture(t);
   store.updateCard('user-a', { expectedVersion: 0, preferences: ['清爽'] });
   store.appendUserMessage('user-a', sessionId, { requestId: 'saved', content: '旧版消息' });
-  store.db.exec(`DROP TABLE run_events; DROP TABLE run_snapshots; DROP TABLE feedback; DROP TABLE handoffs; DROP TABLE consultation_runs; ALTER TABLE messages DROP COLUMN metadata; PRAGMA user_version=1;`);
+  store.db.exec(`DROP TABLE device_credentials; DROP TABLE care_events; DROP TABLE routine_actions; DROP TABLE routine_runs;
+    DROP TABLE run_events; DROP TABLE run_snapshots; DROP TABLE feedback; DROP TABLE handoffs; DROP TABLE consultation_runs;
+    ALTER TABLE messages DROP COLUMN metadata; PRAGMA user_version=1;`);
   // A second handle simulates the upgrade while the old handle is idle.
   const upgraded = new Store(join(dir, 'test.sqlite'));
   try {
-    assert.equal(upgraded.health().schemaVersion, 4);
+    assert.equal(upgraded.health().schemaVersion, 6);
     assert.deepEqual(upgraded.getCard('user-a').preferences, ['清爽']);
     assert.equal(upgraded.listMessages('user-a', sessionId, 20, 0).items[0]?.content, '旧版消息');
     const work = new Workflows(upgraded);

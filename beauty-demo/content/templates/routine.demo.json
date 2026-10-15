@@ -1,0 +1,18 @@
+[
+  {
+    "productId": "demo-gentle-cleanser", "name": "虚构演示洁面", "version": "demo-v1", "dataKind": "demo",
+    "sources": [{ "sourceId": "demo-cleanser-guide", "title": "虚构护肤流程演示资料：洁面", "locator": "demo://fixtures/cleanser", "collectedAt": "2026-10-14T00:00:00Z" }],
+    "facts": [
+      { "factId": "demo-cleanser-usage", "category": "usage", "text": "用这款虚构演示洁面按演示说明轻柔清洁，再用清水洗净。实际产品请以包装为准。", "sourceId": "demo-cleanser-guide", "reviewStatus": "approved" },
+      { "factId": "demo-cleanser-caution", "category": "precautions", "text": "这是虚构示例，不代替任何真实洁面产品的使用说明。", "sourceId": "demo-cleanser-guide", "reviewStatus": "approved" }
+    ]
+  },
+  {
+    "productId": "demo-gentle-cream", "name": "虚构演示面霜", "version": "demo-v1", "dataKind": "demo",
+    "sources": [{ "sourceId": "demo-cream-guide", "title": "虚构护肤流程演示资料：面霜", "locator": "demo://fixtures/cream", "collectedAt": "2026-10-14T00:00:00Z" }],
+    "facts": [
+      { "factId": "demo-cream-usage", "category": "usage", "text": "用这款虚构演示面霜按演示说明轻柔涂抹。实际产品用量、范围及频次请以包装为准。", "sourceId": "demo-cream-guide", "reviewStatus": "approved" },
+      { "factId": "demo-cream-caution", "category": "precautions", "text": "这是虚构示例；不适时停止使用真实产品并咨询专业人士。", "sourceId": "demo-cream-guide", "reviewStatus": "approved" }
+    ]
+  }
+]

@@ -79,6 +79,13 @@ test('customer can submit explicitly authorised photo inputs to the video-moment
   assert.equal(created.body.status, 'not_configured');
   assert.equal(created.body.photoCount, 5);
   assert.match(created.body.message, /尚未生成视频文件/);
+  const other = await f.customer();
+  assert.equal((await f.request('/api/customer/video-moments', 'GET', undefined, other.headers)).body.items.length, 0);
+  assert.equal((await f.request(`/api/customer/video-moments/${created.body.jobId}`, 'DELETE', undefined, other.headers)).status, 404);
+  assert.equal((await f.request('/api/customer/video-moments', 'GET', undefined, customer.headers)).body.items.length, 1);
+  assert.equal((await f.request(`/api/customer/video-moments/${created.body.jobId}`, 'DELETE', undefined, customer.headers)).status, 200);
+  assert.equal((await f.request('/api/customer/video-moments', 'GET', undefined, customer.headers)).body.items.length, 0);
+  assert.equal((await f.request(`/api/customer/video-moments/${created.body.jobId}`, 'DELETE', undefined, customer.headers)).status, 404);
   const rejected = await f.request('/api/customer/video-moments', 'POST', { authorized: false, photos }, customer.headers);
   assert.equal(rejected.status, 422);
 });

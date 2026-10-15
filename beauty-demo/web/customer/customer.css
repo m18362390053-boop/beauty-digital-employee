@@ -111,6 +111,27 @@
 .customer-footer { display: flex; justify-content: space-between; gap: 20px; padding: 22px 28px 38px; border-top: 1px solid #e7dcee; font-size: 12px; }
 .customer-footer span:first-child { color: #755289; font-weight: 700; }
 .customer-page .face-guide { max-width: 100%; }
+.care-panel { margin-top: 20px; padding: 22px; border-radius: 18px; }
+.care-panel h2 { margin: 0 0 6px; color: #49325f; font-size: 23px; }
+.care-panel h3 { margin: 18px 0 8px; font-size: 17px; }
+.care-panel label { display: block; margin: 12px 0 5px; font-weight: 600; }
+.care-panel select[multiple] { min-height: 105px; width: 100%; }
+.care-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.care-panel [hidden] { display: none; }
+.care-image-input { margin: 14px 0; padding: 12px 15px; border: 1px solid #e9deef; border-radius: 12px; background: #fcfafd; }
+.care-image-input > label { font-size: 14px; }
+.care-image-input label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+.care-image-input input[type="checkbox"] { width: auto; flex: none; }
+.care-image-input img { display: block; max-width: min(220px, 100%); max-height: 160px; margin: 10px 0; object-fit: contain; }
+.care-image-input img[hidden] { display: none; }
+.care-actions input { flex: 1 1 240px; }
+.care-actions button { min-height: 42px; }
+.care-actions label { margin: 0; }
+.care-actions select { width: auto; min-width: 110px; }
+.care-step { margin-top: 12px; padding: 16px; border-radius: 12px; background: #f5edf9; }
+.care-step strong { display: block; font-size: 18px; }
+.care-step p { margin: 7px 0; }
+.care-event { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 6px 0; border-top: 1px solid #eee3f2; font-size: 13px; }
 .video-moment-dialog { width: min(720px, calc(100vw - 28px)); max-height: min(82vh, 760px); padding: 0; border: 1px solid #ddcce7; border-radius: 22px; background: #fffdfd; color: #453552; box-shadow: 0 24px 70px #35213c55; }
 .video-moment-dialog::backdrop { background: #281d31a8; backdrop-filter: blur(3px); }
 .video-moment-head { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding: 25px 27px 18px; border-bottom: 1px solid #eee3f1; background: linear-gradient(110deg, #fffdfa, #f5eafa); }

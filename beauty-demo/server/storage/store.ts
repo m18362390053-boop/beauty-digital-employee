@@ -23,7 +23,7 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
     const version = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
-    if (version.user_version > 4) {
+    if (version.user_version > 6) {
       this.db.close();
       throw new Error('Database schema is newer than this application');
     }
@@ -129,10 +129,57 @@ export class Store {
         PRAGMA user_version = 4;
       `);
     });
+    if (version.user_version < 5) this.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS routine_runs (
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+          start_request_id TEXT NOT NULL, start_json TEXT NOT NULL,
+          period TEXT NOT NULL CHECK(period IN ('morning','evening')),
+          status TEXT NOT NULL CHECK(status IN ('active','finished','stopped')),
+          current_step INTEGER NOT NULL, steps_json TEXT NOT NULL,
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+          UNIQUE(user_id,start_request_id)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS one_active_routine ON routine_runs(user_id) WHERE status='active';
+        CREATE TABLE IF NOT EXISTS routine_actions (
+          run_id TEXT NOT NULL REFERENCES routine_runs(id), request_id TEXT NOT NULL,
+          input_json TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
+        CREATE TABLE IF NOT EXISTS care_events (
+          id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES routine_runs(id),
+          step_index INTEGER NOT NULL, product_id TEXT NOT NULL REFERENCES products(id),
+          source TEXT NOT NULL CHECK(source IN ('screen','typed_text','device_button')),
+          feeling TEXT, created_at TEXT NOT NULL, voided_at TEXT,
+          UNIQUE(run_id,step_index)
+        );
+        CREATE INDEX IF NOT EXISTS care_events_by_run ON care_events(run_id);
+        CREATE TABLE IF NOT EXISTS device_credentials (
+          hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires_at INTEGER NOT NULL
+        );
+        PRAGMA user_version = 5;
+      `);
+    });
+    if (version.user_version < 6) this.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS care_plans (
+          id TEXT PRIMARY KEY, version TEXT NOT NULL, document TEXT NOT NULL, digest TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        ALTER TABLE routine_runs ADD COLUMN plan_json TEXT;
+        CREATE TABLE IF NOT EXISTS modality_events (
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+          modality TEXT NOT NULL CHECK(modality IN ('image','asr','tts')),
+          provider TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('succeeded','failed')),
+          code TEXT, created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS modality_events_by_user ON modality_events(user_id,created_at);
+        PRAGMA user_version = 6;
+      `);
+    });
   }
 
   close() { this.db.close(); }
-  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 4 }; }
+  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 6 }; }
 
   private transaction<T>(work: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
