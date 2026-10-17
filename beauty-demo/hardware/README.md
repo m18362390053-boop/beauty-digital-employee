@@ -12,10 +12,10 @@
 
 ## 开测最小清单
 
-1. **不要接 LCD、功放、TF 卡或电池**。先用可靠的 USB-C **数据线**连接 Sense；电脑设备管理器确认新 COM 口，记下编号，不把 BOOT 键当业务按钮。
+1. **不要接 LCD、功放、TF 卡或电池**。先用可靠的 USB-C **数据线**连接 Sense；Windows 在设备管理器确认新 COM 口，Mac 查看新出现的 `/dev/cu.usbmodem*`，记下实际串口名，不把 BOOT 键当业务按钮。
 2. 按[USB 联调文档](../docs/ESP32S3-USB本地联调.md)安装 Arduino ESP32 **3.x** 开发板包和 **ArduinoJson 7.x**，板选 `XIAO_ESP32S3`、`USB CDC On Boot: Enabled`，编译并烧录 `xiao-esp32s3-usb/xiao-esp32s3-usb.ino`。若无编译环境或烧录失败，先记录错误，不当作硬件坏了；找不到 COM 口可按[官方 BootLoader 指南](https://wiki.seeedstudio.com/cn/xiao_esp32s3_getting_started/)恢复。
 3. 同一台电脑启动项目后端，在网页为**虚构演示商品**创建护理流程；运营端签发**绑定该用户**的设备 token 并存入电脑私有文件。关掉串口监视器，再开 Python 桥接。默认无外接按钮时，电脑应每约 3 秒打印 `USB state: active step=0`，而不是原文或凭据。
 4. 如果组员准备了外接**瞬时按钮**，先核对 D0(GPIO1) 和 GND 再断电接线；按下只发 `repeat`，后端不会产生完成记录。不接按钮也能测试读取状态。**绝不**用 GPIO0/BOOT 代替该按钮，也不要在未核对排针时盲插。
-5. 记录板型、Arduino/ArduinoJson 版本、COM 号、后端返回、断线重连、按钮操作及护理事件条数；不得将 token、用户资料、照片或原始录音贴到公开日志。实际通过后才写“USB 实物联调成功”。
+5. 记录操作系统、板型、Arduino/ArduinoJson 版本、串口名、后端返回、断线重连、按钮操作及护理事件条数；不得将 token、用户资料、照片或原始录音贴到公开日志。实际通过后才写“USB 实物联调成功”。同一份源码拟支持 Windows/Mac，但**Mac 尚未实物验收**，命令差异见[USB 联调文档](../docs/ESP32S3-USB本地联调.md)。
 
 屏幕、功放、麦克风、摄像头的功能验收属于后续阶段；第一阶段不是多模态或整机验收。
