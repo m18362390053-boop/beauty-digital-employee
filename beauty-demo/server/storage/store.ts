@@ -23,7 +23,7 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
     const version = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
-    if (version.user_version > 6) {
+    if (version.user_version > 7) {
       this.db.close();
       throw new Error('Database schema is newer than this application');
     }
@@ -176,10 +176,30 @@ export class Store {
         PRAGMA user_version = 6;
       `);
     });
+    if (version.user_version < 7) this.transaction(() => {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS skincare_schedules (
+        share_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL
+      ); PRAGMA user_version = 7;`);
+    });
   }
 
   close() { this.db.close(); }
-  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 6 }; }
+  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 7 }; }
+
+  getSkincareSchedule(shareToken: string) {
+    const shareId = hash({ shareToken });
+    const row = this.db.prepare('SELECT document, updated_at AS updatedAt FROM skincare_schedules WHERE share_id = ?').get(shareId) as { document: string; updatedAt: string } | undefined;
+    return row ? { document: JSON.parse(row.document), updatedAt: row.updatedAt } : null;
+  }
+
+  saveSkincareSchedule(shareToken: string, document: unknown) {
+    const shareId = hash({ shareToken });
+    const updatedAt = now();
+    this.db.prepare(`INSERT INTO skincare_schedules (share_id, document, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(share_id) DO UPDATE SET document=excluded.document, updated_at=excluded.updated_at`)
+      .run(shareId, JSON.stringify(document), updatedAt);
+    return { saved: true, updatedAt };
+  }
 
   private transaction<T>(work: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');

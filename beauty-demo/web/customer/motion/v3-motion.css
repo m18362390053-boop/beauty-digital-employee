@@ -1,0 +1,35 @@
+/* V3 motion layer: scoped to the customer page, adapted from UI参考. */
+.customer-page-grid { transform: translate3d(calc(var(--px, 0) * -9px), calc(var(--py, 0) * -6px), 0) scale(1.025); }
+.customer-home .hero-art img { transform: translate3d(calc(var(--blob-shift-x, 0px) * .8), calc(var(--blob-shift-y, 0px) * .8), 0); }
+.customer-home .hero-art[data-liquid-blob]::after, .customer-page [data-spec]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--spec-bright, 0); background: conic-gradient(from var(--spec-angle, 2.4rad), transparent 0 35%, #fff9e5a6 47%, transparent 59%); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; padding: 1px; }
+.customer-page [data-spec] { position: relative; isolation: isolate; }
+.customer-page .topic-card { background-image: radial-gradient(circle at var(--card-light-x, 50%) var(--card-light-y, 50%), #ffffffdd, transparent 55%), linear-gradient(145deg, #fffefd, #f5edf8); }
+.customer-page .topic-card img { transform: translate(var(--blob-shift-x, 0px), var(--blob-shift-y, 0px)); transition: transform .24s ease; }
+.customer-page [data-motion-button] { position: relative; overflow: hidden; isolation: isolate; }
+.customer-page [data-motion-button]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #ffffff75, transparent 50%); opacity: 0; transition: opacity .2s; }
+.customer-page [data-motion-button]:hover::before { opacity: 1; }
+.motion-ripple { position: absolute; width: 18px; height: 18px; border: 1px solid #ffffffa8; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%) scale(.2); animation: motion-ripple .65s ease-out forwards; }
+@keyframes motion-ripple { to { transform: translate(-50%, -50%) scale(12); opacity: 0; } }
+.cursor-spray { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 30; pointer-events: none; background: transparent; }
+.motion-butterfly { position: fixed; left: 50%; top: 40%; z-index: 31; width: 34px; pointer-events: none; transform: translate(-50%, -64%); filter: drop-shadow(0 2px 4px #32234175); will-change: left, top, rotate; }
+.motion-butterfly img { display: block; width: 100%; height: auto; }
+.motion-butterfly[data-state="takingOff"] img, .motion-butterfly[data-state="flying"] img { animation: butterfly-wings .14s ease-in-out infinite alternate; }
+.motion-butterfly[data-state="landing"] img { animation: butterfly-wings .3s ease-out 2 alternate; }
+@keyframes butterfly-wings { from { transform: scaleX(.66) rotate(-5deg); } to { transform: scaleX(1.02) rotate(5deg); } }
+.butterfly-anchor { position: absolute; right: 13px; top: 14px; width: 1px; height: 1px; pointer-events: none; }
+.hero-art .butterfly-anchor { right: 19%; top: 25%; }
+::view-transition-old(home-view), ::view-transition-new(home-view), ::view-transition-old(consult-view), ::view-transition-new(consult-view) { animation-duration: .52s; animation-timing-function: cubic-bezier(.22,.78,.18,1); }
+::view-transition-old(home-view), ::view-transition-old(consult-view) { animation-name: v3-out; }
+::view-transition-new(home-view), ::view-transition-new(consult-view) { animation-name: v3-in; }
+@keyframes v3-out { to { opacity: 0; transform: scale(.975) translateY(-9px); } }
+@keyframes v3-in { from { opacity: 0; transform: scale(.985) translateY(12px); } }
+#home-view { view-transition-name: home-view; }
+#consult-view { view-transition-name: consult-view; }
+@media (max-width: 820px) { .cursor-spray { display: none; } .motion-butterfly { width: 24px; } }
+@media (prefers-reduced-motion: reduce) {
+  .customer-page-grid, .customer-home .hero-art img, .customer-page .topic-card img { transform: none !important; }
+  .cursor-spray, .motion-butterfly { display: none !important; }
+  .customer-page [data-spec]::after, .customer-home .hero-art[data-liquid-blob]::after { display: none; }
+  .motion-ripple { display: none; }
+  ::view-transition-old(*), ::view-transition-new(*) { animation-duration: .001ms !important; }
+}

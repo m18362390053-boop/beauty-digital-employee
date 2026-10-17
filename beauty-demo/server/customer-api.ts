@@ -11,9 +11,22 @@ import { AppError } from './core/errors.js';
 import { ProductVision } from './core/product-vision.js';
 import { ProviderError } from './core/providers.js';
 import { SpeechService } from './core/speech.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { recognizeProductLabel } from './core/product-ocr.js';
 
 const friendlyFailure = '当前智能客服暂时无法完成回复。您的消息已保存，可以稍后重试或请求人工。';
+const skincareScheduleSchema = z.object({
+  products: z.array(z.record(z.string(), z.unknown())).max(300),
+  checks: z.record(z.string(), z.record(z.string(), z.boolean())),
+  observations: z.record(z.string(), z.unknown()),
+}).strict().refine(value => JSON.stringify(value).length <= 2_000_000, '护肤日程数据过大');
+function requireScheduleShare(input: unknown) {
+  const supplied = z.string().min(32).max(128).parse(input);
+  const expected = process.env.BEAUTY_SCHEDULE_SHARE_TOKEN ?? '';
+  const a = Buffer.from(supplied); const b = Buffer.from(expected);
+  if (b.length < 32 || a.length !== b.length || !timingSafeEqual(a, b)) throw new AppError(403, 'SCHEDULE_SHARE_INVALID', '护肤日程共享链接无效。');
+  return supplied;
+}
 function sessionTopic(text: string) {
   if (/眼周|卧蚕|眼袋|法令纹|T区|额头|鼻翼|脸颊|下巴|涂.{0,4}(?:哪|位置)|(?:哪|哪里|哪儿).{0,4}涂|使用.{0,5}(?:位置|部位)|起皮|死皮|部位|区域|位置/.test(text)) return '面部位置与用法';
   if (/退货|退款|物流|快递|投诉|售后/.test(text)) return '售后服务';
@@ -50,6 +63,16 @@ export function mountCustomerApi(app: Express, store: Store, service: CustomerSe
     serviceAvailable: service.status().providers.jevConfigured && service.status().providers.chatConfigured,
   }));
   app.get('/api/customer/card', (_req, res) => res.json(store.getCard(res.locals.customerUserId)));
+  app.get('/api/customer/skincare-schedule', (req, res) => {
+    const shareToken = requireScheduleShare(req.query.share);
+    res.json(store.getSkincareSchedule(shareToken) ?? { document: null, updatedAt: null });
+  });
+  app.put('/api/customer/skincare-schedule', (req, res) => {
+    const shareToken = requireScheduleShare(req.body?.share);
+    const document = skincareScheduleSchema.parse(req.body?.document);
+    res.json(store.saveSkincareSchedule(shareToken, document));
+  });
+  app.post('/api/customer/product-ocr', async (req, res) => res.json(await recognizeProductLabel(req.body)));
   app.patch('/api/customer/card', (req, res) => res.json(store.updateCard(res.locals.customerUserId, req.body)));
   app.get('/api/customer/input/capabilities', (_req, res) => res.json({
     typedText: 'available', packagingTextMatch: 'available', screenButtons: 'available',

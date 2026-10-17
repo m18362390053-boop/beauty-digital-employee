@@ -1,4 +1,9 @@
 import { renderFaceGuide } from './face-illustration.js';
+import { createPageTransition } from './motion/page-transition.js';
+import { createButterflyFlight } from './motion/butterfly-flight.js';
+import { initPointerLighting } from './motion/pointer-lighting.js';
+import { initHomePortal } from './motion/home-portal.js';
+import { initSkincareSchedule } from './skincare-schedule.js';
 
 const $ = id => document.getElementById(id);
 const state = { csrf: '', productId: '', sessionId: '', sessions: [], card: null, abort: null, pending: null, videoPhotos: [], routine: null, careProducts: [], productPhoto: null, visionAbort: null, visionConfigured: false, imageProvider: null, asrConfigured: false, ttsConfigured: false, recorder: null, voice: null, voiceUrl: null, voiceAbort: null };
@@ -9,36 +14,58 @@ const factLabels = { skinType: '你确认的肤质倾向', sensation: '使用感
 function el(tag, text, className) { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; }
 function notice(text) { $('customer-notice').textContent = text; }
 function renderView(view, focus = false) {
+  const home = view === 'home';
   const consulting = view === 'consult';
-  $('home-view').hidden = consulting;
+  const schedule = view === 'schedule';
+  $('home-view').hidden = !home;
   $('consult-view').hidden = !consulting;
-  $('home-link').hidden = !consulting;
-  document.title = consulting ? '在线咨询 · 暖颜' : '暖颜 · 专属美妆顾问';
+  $('schedule-view').hidden = !schedule;
+  $('home-link').hidden = home;
+  if (home) homePortal.reset();
+  document.title = consulting ? '在线咨询 · 暖颜' : schedule ? '护肤日程 · 暖颜' : '暖颜 · 专属美妆顾问';
   if (focus && consulting) $('message').focus();
+  if (focus && schedule) $('schedule-title').focus();
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
+const butterflyFlight = createButterflyFlight($('motion-butterfly'));
+const homePortal = initHomePortal(document.querySelector('.home-portal'));
+const transitionTo = createPageTransition({ render: renderView, afterRender: (view, animated) => butterflyFlight.moveTo(view, animated) });
 let currentView = null;
-function showView(view, focus = false) {
-  if (currentView === view) { if (focus && view === 'consult') $('message').focus(); return; }
+function showView(view, focus = false, animate = true) {
+  if (currentView === view) { if (focus && view === 'consult') $('message').focus(); if (focus && view === 'schedule') $('schedule-title').focus(); return Promise.resolve(); }
   currentView = view;
-  renderView(view, focus);
+  return transitionTo(view, { animate, focus });
 }
-function openConsult(focus = false) { if (location.hash !== '#consult') location.hash = 'consult'; showView('consult', focus); }
-window.addEventListener('hashchange', () => showView(location.hash === '#consult' ? 'consult' : 'home'));
+function openConsult(focus = false) { if (location.hash !== '#consult') location.hash = 'consult'; return showView('consult', focus); }
+function openSchedule(focus = false) { if (location.hash !== '#schedule') location.hash = 'schedule'; return showView('schedule', focus); }
+function viewFromHash() { return location.hash === '#consult' ? 'consult' : location.hash === '#schedule' ? 'schedule' : 'home'; }
+window.addEventListener('hashchange', () => showView(viewFromHash()));
 $('home-link').addEventListener('click', () => { location.hash = 'home'; showView('home'); });
-$('start-consultation').addEventListener('click', () => openConsult(true));
-$('view-consultations').addEventListener('click', () => { openConsult(); $('new-session').focus(); });
+$('start-consultation').addEventListener('click', () => { void homePortal.choose('consult', () => openConsult(true)); });
+$('view-records').addEventListener('click', () => { void homePortal.choose('records', async () => { await openConsult(false); ($('session-groups').querySelector('button') ?? $('new-session')).focus(); }); });
+$('view-schedule').addEventListener('click', () => openSchedule(true));
 const videoDialog = $('video-moment-dialog');
 $('start-video-moment').addEventListener('click', () => {
-  safely(loadVideoMoments);
-  if (typeof videoDialog.showModal === 'function') videoDialog.showModal();
-  else videoDialog.setAttribute('open', '');
+  void homePortal.choose('moment', () => {
+    safely(loadVideoMoments);
+    if (typeof videoDialog.showModal === 'function') videoDialog.showModal();
+    else videoDialog.setAttribute('open', '');
+  });
 });
 for (const button of document.querySelectorAll('.topic-card')) button.addEventListener('click', () => {
   $('message').value = button.dataset.prompt ?? '';
   openConsult(true);
 });
-showView(location.hash === '#consult' ? 'consult' : 'home');
+showView(viewFromHash(), false, false);
+initPointerLighting();
+const skincareShareToken = new URLSearchParams(location.search).get('share') ?? '';
+const skincareSchedule = initSkincareSchedule({
+  recognize: imageBase64 => api('/api/customer/product-ocr', 'POST', { imageBase64 }),
+  shareToken: skincareShareToken,
+  syncSchedule: (share, document) => document === undefined
+    ? api(`/api/customer/skincare-schedule?share=${encodeURIComponent(share)}`)
+    : api('/api/customer/skincare-schedule', 'PUT', { share, document }),
+});
 async function safely(fn) { try { await fn(); } catch { notice('暂时无法完成操作，请刷新后重试，或联系人工。'); } }
 async function api(path, method = 'GET', body, signal) {
   const response = await fetch(path, { method, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -482,6 +509,7 @@ $('human').addEventListener('click', () => safely(async () => { if (!state.sessi
 $('check').addEventListener('click', () => safely(async () => { if (!state.pending) return; const p = state.pending; const result = await api(`/api/customer/sessions/${p.sessionId}/runs/${p.requestId}`); if (result.result) { notice(result.result.message); pending(null); } else notice('请求仍在处理中，请稍候。'); await messages(); }));
 safely(async () => {
   const auth = await api('/api/auth/customer/start', 'POST', {}); state.csrf = auth.csrfToken;
+  await skincareSchedule.hydrateShared();
   const info = await api('/api/customer/bootstrap'); state.productId = info.products[0]?.productId ?? '';
   $('product-select').replaceChildren();
   for (const product of info.products) {
