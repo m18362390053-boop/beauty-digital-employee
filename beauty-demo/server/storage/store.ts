@@ -23,6 +23,13 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
     const version = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
+    // Older local skincare builds also used schema version 5 for schedules. Use
+    // the actual schema as well as user_version so those databases can upgrade.
+    const hasTable = (name: string) => Boolean(this.db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+    ).get(name));
+    const hasRoutinePlanColumn = () => hasTable('routine_runs') &&
+      (this.db.prepare('PRAGMA table_info(routine_runs)').all() as Array<{ name: string }>).some(column => column.name === 'plan_json');
     if (version.user_version > 7) {
       this.db.close();
       throw new Error('Database schema is newer than this application');
@@ -129,7 +136,7 @@ export class Store {
         PRAGMA user_version = 4;
       `);
     });
-    if (version.user_version < 5) this.transaction(() => {
+    if (version.user_version < 5 || !hasTable('routine_runs')) this.transaction(() => {
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS routine_runs (
           id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
@@ -160,12 +167,11 @@ export class Store {
         PRAGMA user_version = 5;
       `);
     });
-    if (version.user_version < 6) this.transaction(() => {
+    if (version.user_version < 6 || !hasTable('care_plans') || !hasTable('modality_events') || !hasRoutinePlanColumn()) this.transaction(() => {
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS care_plans (
           id TEXT PRIMARY KEY, version TEXT NOT NULL, document TEXT NOT NULL, digest TEXT NOT NULL, created_at TEXT NOT NULL
         );
-        ALTER TABLE routine_runs ADD COLUMN plan_json TEXT;
         CREATE TABLE IF NOT EXISTS modality_events (
           id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
           modality TEXT NOT NULL CHECK(modality IN ('image','asr','tts')),
@@ -173,8 +179,9 @@ export class Store {
           code TEXT, created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS modality_events_by_user ON modality_events(user_id,created_at);
-        PRAGMA user_version = 6;
       `);
+      if (!hasRoutinePlanColumn()) this.db.exec('ALTER TABLE routine_runs ADD COLUMN plan_json TEXT');
+      this.db.exec('PRAGMA user_version = 6');
     });
     if (version.user_version < 7) this.transaction(() => {
       this.db.exec(`CREATE TABLE IF NOT EXISTS skincare_schedules (
