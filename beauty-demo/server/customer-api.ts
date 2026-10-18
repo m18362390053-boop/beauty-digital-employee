@@ -19,6 +19,7 @@ const skincareScheduleSchema = z.object({
   products: z.array(z.record(z.string(), z.unknown())).max(300),
   checks: z.record(z.string(), z.record(z.string(), z.boolean())),
   observations: z.record(z.string(), z.unknown()),
+  ocrDraft: z.object({ candidates: z.array(z.string().max(80)).max(8), recognizedAt: z.string().datetime() }).strict().nullable().optional(),
 }).strict().refine(value => JSON.stringify(value).length <= 2_000_000, '护肤日程数据过大');
 function requireScheduleShare(input: unknown) {
   const supplied = z.string().min(32).max(128).parse(input);

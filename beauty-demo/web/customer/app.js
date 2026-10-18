@@ -37,13 +37,12 @@ function showView(view, focus = false, animate = true) {
   return transitionTo(view, { animate, focus });
 }
 function openConsult(focus = false) { if (location.hash !== '#consult') location.hash = 'consult'; return showView('consult', focus); }
-function openSchedule(focus = false) { if (location.hash !== '#schedule') location.hash = 'schedule'; return showView('schedule', focus); }
+function openSchedule(focus = false) { skincareSchedule?.showSchedule(); if (location.hash !== '#schedule') location.hash = 'schedule'; return showView('schedule', focus); }
 function viewFromHash() { return location.hash === '#consult' ? 'consult' : location.hash === '#schedule' ? 'schedule' : 'home'; }
 window.addEventListener('hashchange', () => showView(viewFromHash()));
 $('home-link').addEventListener('click', () => { location.hash = 'home'; showView('home'); });
 $('start-consultation').addEventListener('click', () => { void homePortal.choose('consult', () => openConsult(true)); });
-$('view-records').addEventListener('click', () => { void homePortal.choose('records', async () => { await openConsult(false); ($('session-groups').querySelector('button') ?? $('new-session')).focus(); }); });
-$('view-schedule').addEventListener('click', () => openSchedule(true));
+$('view-records').addEventListener('click', () => { void homePortal.choose('records', () => openSchedule(true)); });
 const videoDialog = $('video-moment-dialog');
 $('start-video-moment').addEventListener('click', () => {
   void homePortal.choose('moment', () => {
