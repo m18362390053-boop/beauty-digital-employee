@@ -1,6 +1,7 @@
 # 护肤双面识别与首页凝珠版本整合
 
-**整合分支：** `feature/skincare-home-capture-consolidation`  
+**整合分支：** `feature/skincare-home-capture-consolidation`
+
 **代码来源：** `feature/skincare-milestone-video-skill` 与 `feature/home-portal-crystal-interaction`
 
 ## 本版本包含
