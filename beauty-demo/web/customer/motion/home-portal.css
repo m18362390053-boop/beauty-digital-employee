@@ -72,6 +72,7 @@
 .portal-copy strong { color: #201e24; font-size: clamp(20px, 1.8vw, 25px); font-weight: 650; line-height: 1.2; letter-spacing: .015em; }
 .portal-copy small { margin-top: 7px; color: #343039; font-size: clamp(11px, 1vw, 13px); font-weight: 550; }
 .portal-blob[data-spec]::after { content: none; }
+/* Interaction note: hover, keyboard focus and chosen state use a bright, low-saturation crystal sheen; keep the labels dark and focus indication inside the blob. */
 .portal-blob:hover, .portal-blob:focus-visible { z-index: 3; scale: 1.025; }
 .portal-blob:hover img, .portal-blob:focus-visible img { opacity: 1; filter: brightness(1.26) saturate(.28) contrast(1.03) drop-shadow(0 13px 20px #35245d42) drop-shadow(0 0 17px #fffaffed); }
 .portal-blob:hover .portal-glint, .portal-blob:focus-visible .portal-glint { opacity: .9; }
