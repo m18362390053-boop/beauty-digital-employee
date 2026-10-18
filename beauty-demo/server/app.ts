@@ -14,6 +14,7 @@ import { skillVersionSchema } from './core/workflow-types.js';
 import { Routines } from './core/routines.js';
 import { ProductVision } from './core/product-vision.js';
 import { SpeechService } from './core/speech.js';
+import { ProviderError } from './core/providers.js';
 import { CarePlans } from './core/care-plans.js';
 
 const param = (req: Request, name: string) => idSchema.parse(req.params[name]);
@@ -68,6 +69,25 @@ export function createApp(store: Store, service = new CustomerService(store), op
   });
   app.post('/api/auth/operator/logout', (req, res) => { access.logout(req, res); res.json({ authenticated: false }); });
   mountCustomerApi(app, store, service, access, routines, options.vision ?? new ProductVision(store, service.modelSettings), options.speech ?? new SpeechService());
+  // Explicitly authorised one-shot USB captures. Device media is not a chat message or care action.
+  const deviceVision = options.vision ?? new ProductVision(store, service.modelSettings);
+  const deviceSpeech = options.speech ?? new SpeechService();
+  app.post('/api/device/media/image/recognize', async (req, res) => {
+    access.requireDevice(req);
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceVision.recognize(req.body, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '图片模型暂不可用。'); throw error; }
+    finally { res.off('close', close); }
+  });
+  app.post('/api/device/media/audio/transcribe', async (req, res) => {
+    access.requireDevice(req);
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceSpeech.transcribe(req.body, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '转写模型暂不可用。'); throw error; }
+    finally { res.off('close', close); }
+  });
   // The gateway uses a user-bound, device-only token; never the operator password or model keys.
   app.get('/api/device/routines/current', (req, res) => res.json({ routine: routines.current(access.requireDevice(req)) }));
   app.post('/api/device/routines/:routineId/actions', (req, res) => {
