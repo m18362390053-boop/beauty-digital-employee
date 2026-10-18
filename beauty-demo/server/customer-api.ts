@@ -19,7 +19,12 @@ const skincareScheduleSchema = z.object({
   products: z.array(z.record(z.string(), z.unknown())).max(300),
   checks: z.record(z.string(), z.record(z.string(), z.boolean())),
   observations: z.record(z.string(), z.unknown()),
-  ocrDraft: z.object({ candidates: z.array(z.string().max(80)).max(8), recognizedAt: z.string().datetime() }).strict().nullable().optional(),
+  ocrDraft: z.object({
+    candidates: z.array(z.string().max(80)).max(8), recognizedAt: z.string().datetime(),
+    caseId: z.string().max(30).optional(), caseName: z.string().max(100).optional(), caseCategory: z.string().max(30).optional(),
+    caseArea: z.string().max(80).optional(), casePeriod: z.enum(['morning', 'evening', 'both']).optional(), casePaoLabel: z.string().max(200).optional(),
+    caseSource: z.string().max(120).optional(), caseSourceUrl: z.string().url().max(500).optional(), caseConflict: z.string().max(500).optional(),
+  }).strict().nullable().optional(),
 }).strict().refine(value => JSON.stringify(value).length <= 2_000_000, '护肤日程数据过大');
 function requireScheduleShare(input: unknown) {
   const supplied = z.string().min(32).max(128).parse(input);

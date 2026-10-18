@@ -1,3 +1,5 @@
+import { matchLorealCase } from './loreal-product-cases.js';
+
 const STORAGE_KEY = 'warm-beauty-skincare-schedule-v1';
 const PERIODS = ['morning', 'evening'];
 const PERIOD_LABELS = { morning: '早上', evening: '晚上', both: '早晚' };
@@ -33,7 +35,7 @@ function readData() {
   return defaultData();
 }
 
-export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule } = {}) {
+export function initSkincareSchedule({ recognize, recognizeVisual, shareToken = '', syncSchedule } = {}) {
   const $ = id => document.getElementById(id);
   const localStorageKey = shareToken ? `${STORAGE_KEY}:${shareToken.slice(0, 12)}` : STORAGE_KEY;
   let data = readData();
@@ -134,9 +136,20 @@ export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule 
       const pending = document.createElement('li'); pending.className = 'ocr-pending';
       const title = document.createElement('strong'); title.textContent = '待核对的识别结果';
       const candidate = document.createElement('p'); candidate.textContent = draft.candidates.join(' / ');
-      const when = document.createElement('small'); when.textContent = '手机拍摄识别 · 请核对后补全产品信息';
-      const review = document.createElement('button'); review.type = 'button'; review.textContent = '核对并补全'; review.addEventListener('click', () => { showEntry(); $('schedule-product-name').value = draft.candidates[0]; $('schedule-product-category').focus(); });
-      pending.append(title, candidate, when, review); list.append(pending);
+      const when = document.createElement('small'); when.textContent = draft.caseName ? `正反面识别候选 · ${draft.caseSource ?? '本地资料卡'} · 请核对包装` : '手机拍摄识别 · 请核对后补全产品信息';
+      pending.append(title, candidate, when);
+      if (draft.caseCategory || draft.caseArea || draft.casePaoLabel) { const details = document.createElement('small'); details.textContent = [draft.caseCategory && `类别：${draft.caseCategory}`, draft.caseArea && `使用部位：${draft.caseArea}`, draft.casePaoLabel && `开封后期限：${draft.casePaoLabel}`].filter(Boolean).join('；'); pending.append(details); }
+      if (draft.caseConflict) { const note = document.createElement('small'); note.textContent = draft.caseConflict; pending.append(note); }
+      if (draft.caseSourceUrl) { const source = document.createElement('a'); source.href = draft.caseSourceUrl; source.target = '_blank'; source.rel = 'noopener'; source.textContent = '打开官方产品资料'; pending.append(source); }
+      const review = document.createElement('button'); review.type = 'button'; review.textContent = draft.caseName ? '核对资料卡并填入' : '核对并补全'; review.addEventListener('click', () => {
+        showEntry(); $('schedule-product-name').value = draft.caseName || draft.candidates[0];
+        if (draft.caseCategory) $('schedule-product-category').value = draft.caseCategory;
+        if (draft.caseArea) $('schedule-product-area').value = draft.caseArea;
+        $('schedule-product-period').value = draft.casePeriod || 'both';
+        if (draft.caseConflict) { $('schedule-feedback').textContent = draft.caseConflict; }
+        $('schedule-product-category').focus();
+      });
+      pending.append(review); list.append(pending);
     }
     if (!activeProducts.length) {
       const empty = document.createElement('li'); empty.className = 'schedule-product-empty';
@@ -147,12 +160,12 @@ export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule 
       const copy = document.createElement('div'); copy.className = 'product-copy';
       const name = document.createElement('strong'); name.textContent = product.name;
       const detail = document.createElement('small'); detail.textContent = `${product.category || '护肤'} · ${product.area ? `用于${product.area} · ` : ''}${PERIOD_LABELS[product.period] ?? '早上'}`;
-      const dates = document.createElement('p'); dates.className = 'product-dates'; dates.textContent = `开封 ${product.openedOn || '未记录'}　预计用至 ${product.expiry || '待计算'}`;
-      const track = document.createElement('div'); track.className = 'product-timeline'; track.setAttribute('role', 'img'); track.setAttribute('aria-label', `建议使用周期：${product.openedOn || '未记录'} 至 ${product.expiry || '待计算'}`);
-      const bar = document.createElement('span'); bar.className = 'product-timeline-bar'; const now = dateKey(today); const spanStart = product.openedOn || now; const spanEnd = product.expiry || now;
+      const dates = document.createElement('p'); dates.className = 'product-dates'; dates.textContent = `开封 ${product.openedOn || '未记录'}　${product.expiry ? `建议使用至 ${product.expiry}` : '开封后期限待核对'}`;
+      const track = document.createElement('div'); track.className = 'product-timeline'; track.setAttribute('role', 'img'); track.setAttribute('aria-label', product.expiry ? `建议使用周期：${product.openedOn || '未记录'} 至 ${product.expiry}` : `开封后建议使用期限尚未核对，开封日期：${product.openedOn || '未记录'}`);
+      const bar = document.createElement('span'); bar.className = 'product-timeline-bar'; bar.hidden = !product.expiry; const now = dateKey(today); const spanStart = product.openedOn || now; const spanEnd = product.expiry || now;
       const monthsApart = (a, b) => { const x = parseDate(a); const y = parseDate(b); return (y.getFullYear() - x.getFullYear()) * 12 + y.getMonth() - x.getMonth(); };
       const monthOffset = Math.max(0, Math.min(11, monthsApart(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`, `${spanStart.slice(0,7)}-01`)));
-      const monthsDuration = Math.max(1, Math.min(12 - monthOffset, monthsApart(spanStart, spanEnd)));
+      const monthsDuration = product.expiry ? Math.max(1, Math.min(12 - monthOffset, monthsApart(spanStart, spanEnd))) : 0;
       bar.style.setProperty('--timeline-start', `${monthOffset * 8.333}%`); bar.style.setProperty('--timeline-width', `${monthsDuration * 8.333}%`); track.append(bar);
       const months = document.createElement('div'); months.className = 'product-timeline-months';
       for (let i = 0; i < 12; i += 1) { const tick = document.createElement('span'); tick.textContent = `${(today.getMonth() + i) % 12 + 1}月`; months.append(tick); }
@@ -166,7 +179,7 @@ export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule 
         const category = document.createElement('select'); category.required = true; category.setAttribute('aria-label', '产品类别');
         for (const value of ['', '洁面', '化妆水', '精华', '乳液', '面霜', '防晒', '眼霜', '面膜', '其他']) { const option = document.createElement('option'); option.value = value; option.textContent = value || '选择类别'; category.append(option); }
         category.value = product.category ?? '';
-        const shelfLife = document.createElement('input'); shelfLife.type = 'number'; shelfLife.min = '1'; shelfLife.max = '60'; shelfLife.required = true; shelfLife.value = product.shelfLifeMonths ?? ''; shelfLife.setAttribute('aria-label', '开封后保质期，月');
+        const shelfLife = document.createElement('input'); shelfLife.type = 'number'; shelfLife.min = '1'; shelfLife.max = '60'; shelfLife.value = product.shelfLifeMonths ?? ''; shelfLife.placeholder = '按开盖标志填写，可留空'; shelfLife.setAttribute('aria-label', '开封后建议使用期限，月');
         const openedOn = document.createElement('input'); openedOn.type = 'date'; openedOn.required = true; openedOn.value = product.openedOn ?? ''; openedOn.setAttribute('aria-label', '开封日期');
         const area = document.createElement('input'); area.required = true; area.maxLength = 40; area.value = product.area ?? ''; area.setAttribute('aria-label', '使用区域');
         const period = document.createElement('select'); period.setAttribute('aria-label', '使用时段');
@@ -186,7 +199,7 @@ export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule 
           if (!selectedDays.length) { $('schedule-feedback').textContent = '请至少选择一天。'; weekdays.focus(); return; }
           if (openedOn.value > dateKey(today)) { $('schedule-feedback').textContent = '开封日期不能晚于今天。'; openedOn.focus(); return; }
           const old = { ...product };
-          Object.assign(product, { category: category.value, name: newName, shelfLifeMonths: Number(shelfLife.value), openedOn: openedOn.value, area: area.value.trim(), period: period.value, weekdays: selectedDays, expiry: expiryFromOpening(openedOn.value, shelfLife.value) });
+          Object.assign(product, { category: category.value, name: newName, shelfLifeMonths: shelfLife.value ? Number(shelfLife.value) : null, openedOn: openedOn.value, area: area.value.trim(), period: period.value, weekdays: selectedDays, expiry: expiryFromOpening(openedOn.value, shelfLife.value) });
           const oldChecks = JSON.parse(JSON.stringify(data.checks));
           if (product.period !== old.period) for (const day of Object.keys(data.checks)) {
             for (const part of PERIODS) if (!productPeriods(product.period).includes(part)) delete data.checks[day][`${product.id}:${part}`];
@@ -277,51 +290,102 @@ export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule 
     first?.focus(); first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   const form = $('schedule-product-form');
-  const photoInput = $('schedule-product-photo');
-  const uploadInput = $('schedule-product-upload');
   const ocrResult = $('schedule-ocr-result');
-  const clearScan = () => { ocrResult.hidden = true; ocrResult.replaceChildren(); photoInput.value = ''; uploadInput.value = ''; };
+  const photos = { front: null, back: null };
+  const clearScan = () => {
+    ocrResult.hidden = true; ocrResult.replaceChildren(); photos.front = null; photos.back = null;
+    for (const side of ['front', 'back']) {
+      $(`schedule-photo-${side}-input`).value = ''; $(`schedule-upload-${side}-input`).value = '';
+      $(`schedule-photo-${side}-preview`).hidden = true; $(`schedule-photo-${side}-preview`).style.backgroundImage = '';
+      $(`schedule-photo-${side}-state`).textContent = '尚未添加';
+    }
+    $('schedule-recognize-product').disabled = true;
+  };
   const showEntry = () => { $('schedule-panel').hidden = true; $('products-panel').hidden = true; $('product-entry-panel').hidden = false; $('schedule-bottom-nav').hidden = true; $('schedule-product-opened').value ||= dateKey(today); };
   const showInventory = () => { $('schedule-panel').hidden = true; $('product-entry-panel').hidden = true; $('products-panel').hidden = false; $('schedule-bottom-nav').hidden = false; document.querySelector('[data-schedule-tab="products"]').setAttribute('aria-current', 'page'); document.querySelector('[data-schedule-tab="schedule"]').removeAttribute('aria-current'); };
   const showSchedule = () => { $('products-panel').hidden = true; $('product-entry-panel').hidden = true; $('schedule-panel').hidden = false; $('schedule-bottom-nav').hidden = false; document.querySelector('[data-schedule-tab="schedule"]').setAttribute('aria-current', 'page'); document.querySelector('[data-schedule-tab="products"]').removeAttribute('aria-current'); };
-  $('schedule-open-camera').addEventListener('click', () => photoInput.click());
-  $('schedule-scan-product').addEventListener('click', () => uploadInput.click());
-  for (const input of [photoInput, uploadInput]) input.addEventListener('change', async () => { const file = input.files?.[0]; input.value = ''; if (file) await recognizePhoto(file); });
-  async function recognizePhoto(file) {
-    ocrResult.hidden = false; ocrResult.textContent = '正在识别包装文字…';
-    const scanButton = $('schedule-scan-product'); scanButton.disabled = true; $('schedule-open-camera').disabled = true;
+  for (const side of ['front', 'back']) {
+    $(`schedule-photo-${side}`).addEventListener('click', () => $(`schedule-photo-${side}-input`).click());
+    $(`schedule-upload-${side}`).addEventListener('click', () => $(`schedule-upload-${side}-input`).click());
+    for (const suffix of ['photo', 'upload']) $(`schedule-${suffix}-${side}-input`).addEventListener('change', async event => {
+      const file = event.currentTarget.files?.[0]; event.currentTarget.value = '';
+      if (!file) return;
+      try {
+        if (file.size > 24_000_000) throw new Error('单张照片请小于 24 MB。');
+        const prepared = await prepareProductPhoto(file);
+        photos[side] = prepared;
+        const preview = $(`schedule-photo-${side}-preview`); preview.style.backgroundImage = `url("${prepared.previewUrl}")`; preview.hidden = false;
+        $(`schedule-photo-${side}-state`).textContent = '照片已准备';
+        $('schedule-recognize-product').disabled = !(photos.front && photos.back);
+        ocrResult.hidden = false; ocrResult.textContent = photos.front && photos.back ? '正反面已齐，可以开始识别。' : `已添加${side === 'front' ? '正面' : '背面'}；再拍另一面。`;
+      } catch { ocrResult.hidden = false; ocrResult.textContent = '无法读取这张照片。请使用相机拍摄或从相册选择 JPG、PNG、WebP 照片。'; }
+    });
+  }
+  $('schedule-recognize-product').addEventListener('click', recognizePair);
+  async function prepareProductPhoto(file) {
+    if (!file.type.startsWith('image/')) throw new Error('not-image');
+    const image = new Image(); const url = URL.createObjectURL(file); image.src = url;
+    try { await image.decode(); } finally { URL.revokeObjectURL(url); }
+    if (!image.naturalWidth || !image.naturalHeight) throw new Error('decode-failed');
+    const encode = (maxSide, maxBytes) => {
+      let scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+      for (const quality of [.94, .88, .8, .72]) {
+        const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality); const dataBase64 = dataUrl.split(',')[1] ?? '';
+        if (dataBase64.length <= maxBytes) return { dataBase64, dataUrl, mediaType: 'image/jpeg' };
+        scale *= .82;
+      }
+      throw new Error('too-large');
+    };
+    const local = encode(3000, 7_300_000);
+    const visual = encode(1280, 1_300_000);
+    return { localBase64: local.dataBase64, visual: { mediaType: visual.mediaType, dataBase64: visual.dataBase64 }, previewUrl: visual.dataUrl };
+  }
+  async function recognizePair() {
+    const button = $('schedule-recognize-product'); button.disabled = true;
+    ocrResult.hidden = false; ocrResult.textContent = '正在读取正面名称和背面标签…';
     try {
-      if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(file.type) || file.size > 24_000_000) throw new Error('请选择小于 24 MB 的清晰包装照片。');
-      const image = new Image(); const url = URL.createObjectURL(file); image.src = url;
-      try { await image.decode(); } finally { URL.revokeObjectURL(url); }
-      let scale = Math.min(1, 3000 / Math.max(image.naturalWidth, image.naturalHeight));
-      let canvas = document.createElement('canvas'); let base64 = '';
-      for (const quality of [.94, .88, .8]) {
-        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-        canvas.getContext('2d', { willReadFrequently: false }).drawImage(image, 0, 0, canvas.width, canvas.height);
-        base64 = canvas.toDataURL('image/jpeg', quality).split(',')[1] ?? '';
-        if (base64.length <= 7_300_000) break;
-        scale *= .85;
+      const [frontOcr, backOcr] = await Promise.allSettled([recognize(photos.front.localBase64), recognize(photos.back.localBase64)]);
+      const ocrResults = [frontOcr, backOcr].filter(item => item.status === 'fulfilled').map(item => item.value);
+      const candidates = [...new Set(ocrResults.flatMap(result => result.candidates ?? []).filter(Boolean))].slice(0, 8);
+      let frontVision = null; let backVision = null; let visionStatus = '';
+      if ($('schedule-vision-consent').checked && recognizeVisual) {
+        try {
+          [frontVision, backVision] = await Promise.all([recognizeVisual(photos.front.visual), recognizeVisual(photos.back.visual)]);
+          visionStatus = '已结合识图模型与文字读取';
+        } catch { visionStatus = '识图模型暂不可用，已使用本机文字读取和资料卡匹配'; }
+      } else if ($('schedule-vision-consent').checked) visionStatus = '此设备未配置外部识图服务，已使用本机文字读取';
+      else visionStatus = '仅在本机读取文字；如需视觉识别，请勾选同意后重试';
+      const texts = [
+        ...ocrResults.flatMap(result => [result.message, ...(result.candidates ?? [])]),
+        frontVision?.observed?.visibleName, frontVision?.observed?.visibleText, frontVision?.observed?.brand,
+        backVision?.observed?.visibleName, backVision?.observed?.visibleText, backVision?.observed?.brand,
+      ].filter(Boolean);
+      const matched = matchLorealCase(texts.join('\n'));
+      const suggestedName = matched?.name || candidates[0] || frontVision?.observed?.visibleName || '';
+      const draft = {
+        candidates: [...new Set([suggestedName, ...candidates].filter(Boolean))].slice(0, 8),
+        recognizedAt: new Date().toISOString(),
+        ...(matched ? { caseId: matched.id, caseName: matched.name, caseCategory: matched.category, caseArea: matched.area, casePeriod: matched.period, casePaoLabel: matched.paoLabel, caseSource: matched.source, caseSourceUrl: matched.sourceUrl, caseConflict: matched.sourceConflict } : {}),
+      };
+      if (draft.candidates.length) {
+        data.ocrDraft = draft;
+        if (save()) $('schedule-sync-feedback').textContent = '正反面识别候选已同步到电脑，请核对后保存';
+        $('schedule-product-name').value = suggestedName;
+        if (matched) { $('schedule-product-category').value = matched.category; $('schedule-product-area').value = matched.area; $('schedule-product-period').value = matched.period; }
       }
-      if (!base64 || base64.length > 7_300_000) throw new Error('照片太大，请靠近包装重拍，或从相册选择。');
-      const result = await recognize(base64);
       ocrResult.replaceChildren();
-      const message = document.createElement('p'); message.textContent = result.message; ocrResult.append(message);
-      if (result.candidates?.length) {
-        data.ocrDraft = { candidates: result.candidates.slice(0, 8), recognizedAt: new Date().toISOString() };
-        if (save()) { $('schedule-sync-feedback').textContent = '识别结果已同步到电脑，等待核对'; }
-        $('schedule-product-name').value = result.candidates[0];
-        const suggestions = document.createElement('div'); suggestions.className = 'product-ocr-suggestions';
-        for (const name of result.candidates) {
-          const button = document.createElement('button'); button.type = 'button'; button.textContent = name;
-          button.addEventListener('click', () => { $('schedule-product-name').value = name; $('schedule-product-name').focus(); });
-          suggestions.append(button);
-        }
-        ocrResult.append(suggestions);
-        $('schedule-product-name').focus();
+      const status = document.createElement('p'); status.textContent = `${visionStatus}。${matched ? `匹配资料卡：${matched.name}（${matched.id}），仍需对照包装确认。` : draft.candidates.length ? '已提取候选信息，请检查正反面与名称是否一致。' : '暂未得到可靠产品名称，请重新拍摄或手动填写。'}`; ocrResult.append(status);
+      if (matched) {
+        const facts = document.createElement('p'); facts.textContent = `资料卡候选：${matched.category} · ${matched.area} · ${matched.volume}。${matched.paoLabel}。${matched.sourceConflict}`; ocrResult.append(facts);
+        if (matched.referenceImage) { const image = document.createElement('img'); image.src = matched.referenceImage; image.alt = `${matched.name}官网正面参考图`; image.loading = 'lazy'; image.className = 'product-case-image'; image.addEventListener('error', () => image.remove()); ocrResult.append(image); }
+        if (matched.sourceUrl) { const source = document.createElement('a'); source.href = matched.sourceUrl; source.target = '_blank'; source.rel = 'noopener'; source.textContent = '打开欧莱雅官网资料核对'; ocrResult.append(source); }
       }
-    } catch (error) { ocrResult.textContent = error?.message?.startsWith('请选择') || error?.message?.startsWith('照片') ? error.message : '这张照片没有读清文字。请让包装占满画面、点按文字对焦、避开反光后重拍；也可以手动填写。'; }
-    finally { scanButton.disabled = false; $('schedule-open-camera').disabled = false; }
+      if (draft.candidates.length) { const note = document.createElement('p'); note.textContent = `正面候选：${frontOcr.status === 'fulfilled' ? (frontOcr.value.candidates ?? []).join('、') || '未读到' : '本机读取失败'}；背面候选：${backOcr.status === 'fulfilled' ? (backOcr.value.candidates ?? []).join('、') || '未读到' : '本机读取失败'}。背面开盖期限请按实物填写。`; ocrResult.append(note); }
+      renderProducts();
+    } catch { ocrResult.textContent = '识别暂时失败。请检查网络或重拍正反面，也可以手动填写产品信息。'; }
+    finally { button.disabled = false; }
   }
   $('schedule-add-product').addEventListener('click', () => { form.reset(); clearScan(); $('schedule-product-opened').value = dateKey(today); showEntry(); $('schedule-product-name').focus(); });
   $('schedule-cancel-product').addEventListener('click', showInventory);
@@ -334,7 +398,7 @@ export function initSkincareSchedule({ recognize, shareToken = '', syncSchedule 
     if (!weekdays.length) { $('schedule-feedback').textContent = '请至少选择一天。'; return; }
     const openedOn = $('schedule-product-opened').value;
     if (openedOn > dateKey(today)) { $('schedule-feedback').textContent = '开封日期不能晚于今天。'; return; }
-    data.products.push({ id: crypto.randomUUID(), category: $('schedule-product-category').value, name, shelfLifeMonths: Number($('schedule-product-shelf-life').value), openedOn, area: $('schedule-product-area').value.trim(), period: $('schedule-product-period').value, weekdays, expiry: expiryFromOpening(openedOn, $('schedule-product-shelf-life').value), startDate: dateKey(today) });
+    data.products.push({ id: crypto.randomUUID(), category: $('schedule-product-category').value, name, shelfLifeMonths: $('schedule-product-shelf-life').value ? Number($('schedule-product-shelf-life').value) : null, openedOn, area: $('schedule-product-area').value.trim(), period: $('schedule-product-period').value, weekdays, expiry: expiryFromOpening(openedOn, $('schedule-product-shelf-life').value), startDate: dateKey(today) });
     if (save()) { data.ocrDraft = null; save(); form.reset(); clearScan(); showInventory(); $('schedule-feedback').textContent = '已保存并加入日程。'; renderAll(); }
     else data.products.pop();
   });

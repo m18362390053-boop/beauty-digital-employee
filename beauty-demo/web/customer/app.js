@@ -60,6 +60,7 @@ initPointerLighting();
 const skincareShareToken = new URLSearchParams(location.search).get('share') ?? '';
 const skincareSchedule = initSkincareSchedule({
   recognize: imageBase64 => api('/api/customer/product-ocr', 'POST', { imageBase64 }),
+  recognizeVisual: image => api('/api/customer/packaging/recognize', 'POST', { authorized: true, image }),
   shareToken: skincareShareToken,
   syncSchedule: (share, document) => document === undefined
     ? api(`/api/customer/skincare-schedule?share=${encodeURIComponent(share)}`)
