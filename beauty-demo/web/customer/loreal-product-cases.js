@@ -25,7 +25,7 @@ export const LOREAL_PRODUCT_CASES = [
     paoLabel: '开封后期限以瓶身开盖标志为准；资料卡未标注 PAO',
     volume: '130ml（资料卡实物记录）',
     source: '团队 SKU-02 资料卡（2026-10-14）及巴黎欧莱雅中国官网',
-    sourceUrl: 'https://www.lorealparis.com.cn/product/X2bVQgpX4QcfDh3KV8R26x/',
+    sourceUrl: 'https://www.lorealparis.com.cn/hydra-fresh/hydra-fresh-anti-ox-grape-seed-hydrating-mask-in-barrier-lotion-130ml',
     usage: '每天早晚使用；清洁后用于脸部及颈部。可用化妆棉轻擦或手心轻拍。',
     sourceConflict: '资料卡列出的“三年”是未开封保质期，不等于开封后 PAO；系统不据此推算开封后到期日。',
   },
