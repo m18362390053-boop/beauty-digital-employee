@@ -155,21 +155,45 @@ export function initSkincareSchedule({ recognize, recognizeVisual, shareToken = 
       const empty = document.createElement('li'); empty.className = 'schedule-product-empty';
       empty.textContent = '还没有已保存的产品。点右上角“添加护肤品”开始记录。'; list.append(empty); return;
     }
+    // One shared calendar domain keeps every product's start and end dates comparable.
+    const dates = activeProducts.flatMap(product => [product.openedOn, product.expiry]).filter(Boolean).sort();
+    const todayKey = dateKey(today);
+    const firstDate = dates[0] && dates[0] < todayKey ? dates[0] : todayKey;
+    const lastDate = dates.at(-1) && dates.at(-1) > todayKey ? dates.at(-1) : todayKey;
+    const axisStart = new Date(Number(firstDate.slice(0, 4)), Number(firstDate.slice(5, 7)) - 1, 1);
+    const axisEnd = new Date(Number(lastDate.slice(0, 4)), Number(lastDate.slice(5, 7)), 1);
+    if ((axisEnd.getFullYear() - axisStart.getFullYear()) * 12 + axisEnd.getMonth() - axisStart.getMonth() < 12) axisEnd.setMonth(axisStart.getMonth() + 12);
+    const monthCount = (axisEnd.getFullYear() - axisStart.getFullYear()) * 12 + axisEnd.getMonth() - axisStart.getMonth();
+    list.style.setProperty('--gantt-month-count', monthCount);
+    list.style.setProperty('--gantt-content-width', `${250 + monthCount * 62}px`);
+    const coordinate = value => {
+      const date = parseDate(value);
+      const month = (date.getFullYear() - axisStart.getFullYear()) * 12 + date.getMonth() - axisStart.getMonth();
+      return Math.max(0, Math.min(1, (month + (date.getDate() - 1) / new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()) / monthCount));
+    };
+    const axis = document.createElement('li'); axis.className = 'product-gantt-axis';
+    const axisLabel = document.createElement('strong'); axisLabel.textContent = '建议使用周期';
+    const monthLabels = document.createElement('div'); monthLabels.className = 'product-gantt-months';
+    for (let i = 0; i < monthCount; i += 1) {
+      const date = new Date(axisStart.getFullYear(), axisStart.getMonth() + i, 1);
+      const tick = document.createElement('span'); tick.textContent = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}`; monthLabels.append(tick);
+    }
+    axis.append(axisLabel, monthLabels); list.append(axis);
     for (const product of activeProducts) {
       const item = document.createElement('li'); item.className = `schedule-product-item category-${categoryGroup(product.category)}`;
       const copy = document.createElement('div'); copy.className = 'product-copy';
       const name = document.createElement('strong'); name.textContent = product.name;
       const detail = document.createElement('small'); detail.textContent = `${product.category || '护肤'} · ${product.area ? `用于${product.area} · ` : ''}${PERIOD_LABELS[product.period] ?? '早上'}`;
-      const dates = document.createElement('p'); dates.className = 'product-dates'; dates.textContent = `开封 ${product.openedOn || '未记录'}　${product.expiry ? `建议使用至 ${product.expiry}` : '开封后期限待核对'}`;
+      const dateSummary = document.createElement('p'); dateSummary.className = 'product-dates'; dateSummary.textContent = `开封 ${product.openedOn || '未记录'}　${product.expiry ? `建议使用至 ${product.expiry}` : '开封后期限待核对'}`;
+      copy.append(name, detail, dateSummary);
       const track = document.createElement('div'); track.className = 'product-timeline'; track.setAttribute('role', 'img'); track.setAttribute('aria-label', product.expiry ? `建议使用周期：${product.openedOn || '未记录'} 至 ${product.expiry}` : `开封后建议使用期限尚未核对，开封日期：${product.openedOn || '未记录'}`);
-      const bar = document.createElement('span'); bar.className = 'product-timeline-bar'; bar.hidden = !product.expiry; const now = dateKey(today); const spanStart = product.openedOn || now; const spanEnd = product.expiry || now;
-      const monthsApart = (a, b) => { const x = parseDate(a); const y = parseDate(b); return (y.getFullYear() - x.getFullYear()) * 12 + y.getMonth() - x.getMonth(); };
-      const monthOffset = Math.max(0, Math.min(11, monthsApart(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`, `${spanStart.slice(0,7)}-01`)));
-      const monthsDuration = product.expiry ? Math.max(1, Math.min(12 - monthOffset, monthsApart(spanStart, spanEnd))) : 0;
-      bar.style.setProperty('--timeline-start', `${monthOffset * 8.333}%`); bar.style.setProperty('--timeline-width', `${monthsDuration * 8.333}%`); track.append(bar);
-      const months = document.createElement('div'); months.className = 'product-timeline-months';
-      for (let i = 0; i < 12; i += 1) { const tick = document.createElement('span'); tick.textContent = `${(today.getMonth() + i) % 12 + 1}月`; months.append(tick); }
-      copy.append(name, detail, dates, track, months);
+      if (product.openedOn && product.expiry) {
+        const bar = document.createElement('span'); bar.className = 'product-timeline-bar';
+        const start = coordinate(product.openedOn); const end = coordinate(product.expiry);
+        bar.style.setProperty('--timeline-start', `${start * 100}%`); bar.style.setProperty('--timeline-width', `${Math.max(0.5, end - start) * 100}%`); track.append(bar);
+        const opening = document.createElement('i'); opening.className = 'product-timeline-marker product-timeline-open'; opening.style.setProperty('--marker-position', `${start * 100}%`); opening.setAttribute('aria-hidden', 'true'); track.append(opening);
+        const expiry = document.createElement('i'); expiry.className = 'product-timeline-marker product-timeline-expiry'; expiry.style.setProperty('--marker-position', `${end * 100}%`); expiry.setAttribute('aria-hidden', 'true'); track.append(expiry);
+      }
       const controls = document.createElement('div'); controls.className = 'product-controls';
       const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'product-edit'; edit.textContent = '编辑';
       edit.setAttribute('aria-label', `编辑${product.name}`);

@@ -578,19 +578,27 @@
 .inventory-legend [data-cat="skincare"] { background: #f1e8f3; color: #704382; }
 .inventory-legend [data-cat="makeup"] { background: #fae9ef; color: #a34568; }
 .inventory-legend [data-cat="hair"] { background: #e8edf8; color: #455c91; }
-.schedule-products { display: grid; gap: 0; padding: 0; list-style: none; }
-.schedule-product-item { display: block; padding: 18px 14px 16px; border-bottom: 1px solid #eadfea; background: #fffdfd; }
-.schedule-product-item .product-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 5px 12px; }
+.schedule-products { display: grid; gap: 0; padding: 0; list-style: none; overflow-x: auto; }
+.product-gantt-axis, .schedule-product-item { display: grid; grid-template-columns: 250px repeat(var(--gantt-month-count), minmax(0, 1fr)); min-width: var(--gantt-content-width); }
+.product-gantt-axis { align-items: end; padding: 12px 14px 9px; border-bottom: 1px solid #ddcfe0; background: #f8f3f8; }
+.product-gantt-axis > strong { grid-column: 1; align-self: center; color: #584363; font-size: 13px; }
+.product-gantt-months { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(var(--gantt-month-count), minmax(0, 1fr)); color: #817487; font-size: 11px; text-align: center; }
+.product-gantt-months span { white-space: nowrap; }
+.schedule-product-item { align-items: center; gap: 8px 0; padding: 14px; border-bottom: 1px solid #eadfea; background: #fffdfd; }
+.schedule-product-item .product-copy { grid-column: 1; grid-row: 1 / span 2; display: grid; align-content: center; gap: 5px; padding-right: 14px; }
 .schedule-product-item .product-copy strong { color: #45334c; font-size: 17px; }
-.schedule-product-item .product-copy small { grid-column: 1; color: #74677b; font-size: 13px; }
-.product-dates { grid-column: 1 / -1; margin: 5px 0 3px; color: #55465d; font-size: 13px; }
-.product-timeline { grid-column: 1 / -1; position: relative; height: 11px; overflow: hidden; border-radius: 8px; background: repeating-linear-gradient(90deg, #f2edf3 0, #f2edf3 calc(8.333% - 2px), #fff calc(8.333% - 2px), #fff 8.333%); }
-.product-timeline-bar { position: absolute; top: 0; bottom: 0; left: var(--timeline-start); width: var(--timeline-width); border-radius: inherit; background: #9a65aa; }
+.schedule-product-item .product-copy small { color: #74677b; font-size: 13px; }
+.product-dates { margin: 3px 0 0; color: #55465d; font-size: 12px; line-height: 1.45; }
+.product-timeline { grid-column: 2 / -1; grid-row: 1; position: relative; height: 20px; overflow: hidden; border-radius: 10px; background: #f2edf3; }
+.product-timeline::before { position: absolute; inset: 0; content: ""; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(100% / var(--gantt-month-count) - 1px), #e5dce7 calc(100% / var(--gantt-month-count) - 1px), #e5dce7 calc(100% / var(--gantt-month-count))); }
+.product-timeline-bar { position: absolute; top: 4px; bottom: 4px; left: var(--timeline-start); width: var(--timeline-width); border-radius: 8px; background: #9a65aa; }
 .category-cleansing .product-timeline-bar { background: #3b9277; }
 .category-makeup .product-timeline-bar { background: #d56b8f; }
 .category-hair .product-timeline-bar { background: #7185bd; }
-.product-timeline-months { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, 1fr); color: #817487; font-size: 10px; text-align: center; }
-.product-controls { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.product-timeline-marker { position: absolute; top: 2px; bottom: 2px; z-index: 1; width: 2px; background: #4e3a56; }
+.product-timeline-open { left: var(--marker-position); }
+.product-timeline-expiry { left: var(--marker-position); background: #392842; }
+.product-controls { grid-column: 2 / -1; grid-row: 2; display: flex; gap: 8px; justify-content: flex-end; }
 .product-controls button { min-width: 48px; min-height: 42px; }
 .schedule-product-form { margin: 14px 0; padding: 0; }
 .schedule-product-form > label { min-height: 92px; }
