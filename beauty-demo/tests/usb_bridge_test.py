@@ -47,7 +47,29 @@ class USBBridgeTests(unittest.TestCase):
             self.assertEqual(bridge.handle(action, "http://127.0.0.1:3090", "token")["eventId"], "")
             self.assertEqual(bridge.handle(action, "http://127.0.0.1:3090", "token")["requestId"], "boot-1")
         self.assertEqual(calls[1], ("POST", "/api/device/routines/care-1/actions",
-                                    {"requestId": "boot-1", "expectedStep": 0, "action": "repeat"}))
+                                     {"requestId": "boot-1", "expectedStep": 0, "action": "repeat"}))
+
+    def test_lcd_demo_enriches_real_step_without_enabling_completion(self):
+        routine = {"routineId": "care-demo", "status": "active", "currentStep": 0,
+                   "current": {"productName": "虚构演示洁面", "instruction": "轻轻清洁面部。"},
+                   "steps": [{"productName": "虚构演示洁面"}, {"productName": "虚构演示面霜"}]}
+        with patch.object(bridge, "api_request", return_value={"routine": routine}) as api:
+            state = bridge.handle({"v": 1, "type": "get"}, "http://127.0.0.1:3090", "token", lcd_demo=True)
+            self.assertEqual(state["step"], 0)
+            self.assertEqual(state["stepCount"], 2)
+            self.assertEqual(state["productName"], "虚构演示洁面")
+            self.assertEqual(state["instruction"], "轻轻清洁面部。")
+            self.assertEqual((state["streakDays"], state["weekCount"], state["bedtime"]), (4, 5, "23:00"))
+            self.assertTrue(state["demo"])
+            self.assertIsNone(state["region"])
+            self.assertEqual(state["buttons"], ["repeat"])
+            self.assertLess(len(json.dumps(state, ensure_ascii=False).encode("utf-8")), 1024)
+            self.assertNotIn("productName", bridge.handle({"v": 1, "type": "get"}, "http://127.0.0.1:3090", "token"))
+            with self.assertRaises(bridge.BridgeError):
+                bridge.handle({"v": 1, "type": "action", "requestId": "x", "routineId": "care-demo",
+                               "expectedStep": 0, "action": "confirm"}, "http://127.0.0.1:3090", "token", lcd_demo=True)
+            api.assert_called_with("http://127.0.0.1:3090", "token", "GET", "/api/device/routines/current")
+        self.assertEqual(bridge.state_message(None, lcd_demo=True)["screen"], "waiting")
 
     def test_reject_invalid_messages_before_any_http(self):
         invalid = [{"v": 1, "type": "action", "requestId": "x", "routineId": "../ops", "expectedStep": 0, "action": "confirm"},

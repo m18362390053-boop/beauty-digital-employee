@@ -8,6 +8,8 @@ import { VolcanoSettings } from '../server/core/volcano.js';
 import { createApp } from '../server/app.js';
 import { testAccess, loginOperator } from './access-helper.js';
 import type { AddressInfo } from 'node:net';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 test('device media requires own device token and consent; model outputs remain drafts, no care actions', async () => {
   const store = new Store(':memory:');
@@ -52,6 +54,49 @@ test('device media requires own device token and consent; model outputs remain d
     assert.equal((store.db.prepare('SELECT count(*) AS n FROM care_events').get() as { n: number }).n, 0);
     await fetch(base + `/api/ops/device-credentials/${userId}`, { method: 'DELETE', headers: ops });
     assert.equal((await post('audio/transcribe', audio, token)).status, 401);
+  } finally {
+    await new Promise<void>(resolve => { server.close(() => resolve()); server.closeIdleConnections(); }); store.close();
+  }
+});
+
+test('device TTS speaks only an owned current step and requires explicit authorization', async () => {
+  const store = new Store(':memory:');
+  const [product] = JSON.parse(await readFile(resolve('content/templates/routine.demo.json'), 'utf8'));
+  store.importProduct(product);
+  let calls = 0;
+  const speech = new SpeechService(new VolcanoSettings({ VOLC_VOICE_API_KEY: 'mock', VOLC_TTS_SPEAKER: 'mock' }), async (_url, options) => {
+    calls++;
+    assert.equal(JSON.parse(String(options?.body)).req_params.text, '用这款虚构演示洁面按演示说明轻柔清洁，再用清水洗净。实际产品请以包装为准。');
+    return new Response(`{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}\n{"code":20000000}\n`);
+  });
+  const service = new CustomerService(store);
+  const server = createApp(store, service, { access: testAccess(store), speech }).listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const auth = await fetch(base + '/api/auth/customer/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const { userId } = await auth.json() as { userId: string };
+    const ops = await loginOperator(base);
+    const issued = await fetch(base + '/api/ops/device-credentials', { method: 'POST', headers: { ...ops, 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+    const { token } = await issued.json() as { token: string };
+    const run = new (await import('../server/core/routines.js')).Routines(store).start(userId, {
+      requestId: 'tts-demo', period: 'evening', productIds: [product.productId], confirmed: true,
+    });
+    const send = (body: unknown, bearer?: string) => fetch(base + '/api/device/speech/synthesize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+      body: JSON.stringify(body),
+    });
+    assert.equal((await send({ authorized: true, routineId: run.routineId })).status, 401);
+    assert.equal((await send({ authorized: false, routineId: run.routineId }, token)).status, 422);
+    assert.equal((await send({ authorized: true, routineId: run.routineId, text: 'arbitrary' }, token)).status, 422);
+    assert.equal((await send({ authorized: true, routineId: 'not-owned' }, token)).status, 404);
+    assert.equal(calls, 0);
+    const result = await send({ authorized: true, routineId: run.routineId }, token);
+    assert.equal(result.status, 200);
+    assert.equal((await result.json() as { mediaType: string }).mediaType, 'audio/mpeg');
+    assert.equal(calls, 1);
+    await fetch(base + `/api/ops/device-credentials/${userId}`, { method: 'DELETE', headers: ops });
+    assert.equal((await send({ authorized: true, routineId: run.routineId }, token)).status, 401);
   } finally {
     await new Promise<void>(resolve => { server.close(() => resolve()); server.closeIdleConnections(); }); store.close();
   }

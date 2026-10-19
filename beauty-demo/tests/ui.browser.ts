@@ -455,7 +455,7 @@ test('browser: configured speech offers reviewed draft and step narration; playb
       assert.match(request.input[0].content[0].audio_url, /^data:audio\/wav;base64,/);
       return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: '好了' }] }] });
     }
-    return new Response(`{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}\n`);
+    return new Response(`{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}\n{"code":20000000}\n`);
   });
   const server = createApp(store, undefined, { access: testAccess(store), speech }).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
