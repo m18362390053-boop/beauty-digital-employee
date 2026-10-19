@@ -51,6 +51,7 @@ export function createApp(store: Store, service = new CustomerService(store), op
   // capped again by their endpoint, but need more room than an ordinary chat payload.
   app.use(express.json({ limit: '18mb' }));
   app.use('/chat', express.static(resolve('web/customer'), { index: 'index.html' }));
+  app.use('/lcd-demo', express.static(resolve('web/lcd-demo'), { index: 'index.html' }));
   app.use('/ops', express.static(resolve('web/operator'), { index: 'index.html' }));
   app.use('/shared', express.static(resolve('web/shared')));
 
