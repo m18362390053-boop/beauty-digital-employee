@@ -23,7 +23,7 @@ function renderView(view, focus = false) {
   $('schedule-view').hidden = !schedule;
   $('home-link').hidden = home;
   if (home) homePortal.reset();
-  document.title = consulting ? '在线咨询 · 暖颜' : schedule ? '护肤日程 · 暖颜' : '暖颜 · 专属美妆顾问';
+  document.title = consulting ? '在线咨询 · 悦见' : schedule ? '护肤日程 · 悦见' : '悦见 · 专属美妆顾问';
   if (focus && consulting) $('message').focus();
   if (focus && schedule) $('schedule-title').focus();
   window.scrollTo({ top: 0, behavior: 'instant' });

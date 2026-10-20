@@ -632,7 +632,59 @@
   .product-timeline-months { font-size: 9px; }
 }
 
-/* Keep the existing visual style while fitting the consultation and OCR flow on portrait phones. */
+/* Approved bright blue-violet to orchid-pink customer homepage, replacing the old plum hero. */
+body.customer-page:has(#home-view:not([hidden])) {
+  background:
+    radial-gradient(ellipse at 92% 4%, #f2c9f2 0, transparent 33%),
+    radial-gradient(ellipse at 2% 22%, #dce9ff 0, transparent 35%),
+    linear-gradient(145deg, #fbfaff 0%, #f7f2ff 58%, #fff5fb 100%);
+}
+body.customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero {
+  border-color: #fff9ff9c;
+  background:
+    radial-gradient(ellipse at 78% 16%, #ffd3f75c 0%, transparent 34%),
+    radial-gradient(ellipse at 80% 90%, #f1b9ef65 0%, transparent 39%),
+    radial-gradient(ellipse at 48% 0%, #a9c9ff52 0%, transparent 48%),
+    linear-gradient(90deg, #48378d58 0%, #5139913e 42%, transparent 67%),
+    linear-gradient(118deg, #6674d9 0%, #8271e2 34%, #a777e2 62%, #d285d6 83%, #e59aca 100%);
+  box-shadow: 0 24px 58px #7658bd28, inset 0 1px #ffffff8a;
+}
+body.customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero::before {
+  opacity: .46;
+  background: radial-gradient(ellipse at 79% 40%, #fff6fd40 0, transparent 38%), radial-gradient(ellipse at 94% 12%, #f5dcff4d 0, transparent 31%);
+  mask-image: none;
+}
+body.customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero::after {
+  background: linear-gradient(90deg, transparent, #ffffff9c, #ffe0f4ba, transparent);
+}
+body.customer-page:has(#home-view:not([hidden])) .hero-kicker { color: #fff1cb; }
+body.customer-page:has(#home-view:not([hidden])) .hero-kicker-line { background: #ffe7ae; }
+body.customer-page:has(#home-view:not([hidden])) .hero-lede { color: #fffaff; }
+body.customer-page:has(#home-view:not([hidden])) .hero-assurance { color: #fff2fc; }
+body.customer-page:has(#home-view:not([hidden])) .schedule-shortcut { color: #fff5dd; border-color: #fff2f5aa; }
+body.customer-page:has(#home-view:not([hidden])) .brand-en { color: #665187; font-size: 11px; }
+body.customer-page:has(#home-view:not([hidden])) .portal-core { color: #35254a; }
+body.customer-page:has(#home-view:not([hidden])) .home-topic-heading h2 { color: #49366f; }
+body.customer-page:has(#home-view:not([hidden])) .home-topic-heading .section-index { color: #6b5a94; }
+body.customer-page:has(#home-view:not([hidden])) .topic-card {
+  border-color: #e1d8f4;
+  background: linear-gradient(145deg, #fff, #f5f1ff 72%, #fff5fb);
+  box-shadow: 0 8px 20px #6041a512;
+}
+body.customer-page:has(#home-view:not([hidden])) .topic-card strong { color: #49386f; }
+body.customer-page:has(#home-view:not([hidden])) .topic-card small { color: #62577e; }
+body.customer-page:has(#home-view:not([hidden])) .home-note { color: #665783; }
+@media (max-width: 540px) {
+  body.customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero {
+    background:
+      radial-gradient(ellipse at 80% 18%, #ffd3f75c 0%, transparent 36%),
+      radial-gradient(ellipse at 75% 92%, #efc0ff55 0%, transparent 40%),
+      linear-gradient(90deg, #48378d50 0%, #51399130 48%, transparent 78%),
+      linear-gradient(145deg, #6375d9 0%, #8971e3 49%, #c57cdb 78%, #e39bcf 100%);
+  }
+}
+
+/* Keep the existing layout while fitting the consultation and OCR flow on portrait phones. */
 @media (max-width: 540px) and (orientation: portrait) {
   .customer-page { overflow-x: clip; }
   .customer-header {
