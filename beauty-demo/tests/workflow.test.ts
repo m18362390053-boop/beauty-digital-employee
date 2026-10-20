@@ -357,7 +357,7 @@ test('v1 database upgrades without losing cards/messages, and interrupted jobs r
   // A second handle simulates the upgrade while the old handle is idle.
   const upgraded = new Store(join(dir, 'test.sqlite'));
   try {
-    assert.equal(upgraded.health().schemaVersion, 6);
+    assert.equal(upgraded.health().schemaVersion, 7);
     assert.deepEqual(upgraded.getCard('user-a').preferences, ['清爽']);
     assert.equal(upgraded.listMessages('user-a', sessionId, 20, 0).items[0]?.content, '旧版消息');
     const work = new Workflows(upgraded);

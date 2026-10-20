@@ -102,6 +102,17 @@
   .portal-core { font-size: 9px; }
   .schedule-shortcut { font-size: 13px; }
 }
+@media (max-width: 540px) and (orientation: portrait) {
+  .home-portal { height: clamp(270px, 77vw, 320px); min-height: 270px; }
+  .portal-blob { width: 46%; height: 42%; }
+  .portal-blob--consult { left: 27%; }
+  .portal-blob--records { left: 0; }
+  .portal-blob--moment { right: 0; }
+  .portal-copy { inset: 17% 5%; }
+  .portal-copy strong { font-size: clamp(14px, 4vw, 17px); line-height: 1.22; }
+  .portal-copy small { max-width: 18ch; margin-top: 4px; font-size: clamp(10px, 2.8vw, 11px); line-height: 1.35; }
+  .portal-core { top: 51%; font-size: 9px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .portal-blob, .portal-blob img, .portal-glint, .portal-relations path { transition-duration: .01ms !important; }
   .portal-blob:hover, .portal-blob:focus-visible { scale: 1; }

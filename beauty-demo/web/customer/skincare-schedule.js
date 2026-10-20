@@ -1,4 +1,5 @@
 import { matchLorealCase } from './loreal-product-cases.js';
+import { createClientId } from './client-id.js';
 
 const STORAGE_KEY = 'warm-beauty-skincare-schedule-v1';
 const PERIODS = ['morning', 'evening'];
@@ -238,7 +239,7 @@ export function initSkincareSchedule({ recognize, recognizeVisual, shareToken = 
         if (!save()) delete product.endDate;
         renderAll();
       });
-      controls.append(edit, remove); item.append(copy, controls); list.append(item);
+      controls.append(edit, remove); item.append(copy, track, controls); list.append(item);
     }
   }
   function renderDay() {
@@ -422,7 +423,7 @@ export function initSkincareSchedule({ recognize, recognizeVisual, shareToken = 
     if (!weekdays.length) { $('schedule-feedback').textContent = '请至少选择一天。'; return; }
     const openedOn = $('schedule-product-opened').value;
     if (openedOn > dateKey(today)) { $('schedule-feedback').textContent = '开封日期不能晚于今天。'; return; }
-    data.products.push({ id: crypto.randomUUID(), category: $('schedule-product-category').value, name, shelfLifeMonths: $('schedule-product-shelf-life').value ? Number($('schedule-product-shelf-life').value) : null, openedOn, area: $('schedule-product-area').value.trim(), period: $('schedule-product-period').value, weekdays, expiry: expiryFromOpening(openedOn, $('schedule-product-shelf-life').value), startDate: dateKey(today) });
+    data.products.push({ id: createClientId(), category: $('schedule-product-category').value, name, shelfLifeMonths: $('schedule-product-shelf-life').value ? Number($('schedule-product-shelf-life').value) : null, openedOn, area: $('schedule-product-area').value.trim(), period: $('schedule-product-period').value, weekdays, expiry: expiryFromOpening(openedOn, $('schedule-product-shelf-life').value), startDate: dateKey(today) });
     if (save()) { data.ocrDraft = null; save(); form.reset(); clearScan(); showInventory(); $('schedule-feedback').textContent = '已保存并加入日程。'; renderAll(); }
     else data.products.pop();
   });

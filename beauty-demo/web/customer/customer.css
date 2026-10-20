@@ -631,3 +631,58 @@
   .product-dates { font-size: 12px; }
   .product-timeline-months { font-size: 9px; }
 }
+
+/* Keep the existing visual style while fitting the consultation and OCR flow on portrait phones. */
+@media (max-width: 540px) and (orientation: portrait) {
+  .customer-page { overflow-x: clip; }
+  .customer-header {
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+  .customer-main {
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+  .customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    min-height: 0;
+    padding: 23px 17px 12px;
+    overflow: hidden;
+  }
+  .customer-home .hero-copy { min-width: 0; }
+  .customer-page:has(#home-view:not([hidden])) .customer-hero h1 {
+    max-width: 15ch;
+    font-size: clamp(28px, 7.6vw, 35px);
+    line-height: 1.26;
+  }
+  .customer-home .hero-lede {
+    max-width: 34ch;
+    margin: 11px 0 8px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .customer-home .hero-assurance { margin-top: 8px; font-size: 11px; line-height: 1.5; }
+  .home-portal {
+    width: 100%;
+    height: clamp(270px, 77vw, 320px);
+    min-height: 0;
+    margin-top: 1px;
+  }
+  .customer-consult-layout { display: flex; flex-direction: column; gap: 14px; }
+  .consult-main { order: 1; width: 100%; }
+  .session-sidebar { order: 2; width: 100%; }
+  .customer-messages { max-height: min(48dvh, 430px); overscroll-behavior: contain; }
+  .customer-composer textarea { max-height: 30dvh; }
+  .care-panel { padding: 17px 15px; }
+  .care-panel :is(input, select, textarea, button) { max-width: 100%; }
+}
+
+@media (max-width: 380px) and (orientation: portrait) {
+  .customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero { padding-inline: 14px; }
+  .customer-home .hero-lede { font-size: 13px; }
+  .home-portal { height: 272px; }
+  .portal-copy { inset-inline: 9%; }
+  .portal-copy strong { font-size: 14px; }
+  .portal-copy small { font-size: 10px; }
+}
