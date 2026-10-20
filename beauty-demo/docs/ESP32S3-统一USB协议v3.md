@@ -1,6 +1,6 @@
 # XIAO ESP32S3 Sense 全输入/输出 USB 协议 v3（独立整合候选）
 
-**状态：电脑网关、后端 TTS 入口与离线替身测试已实现；尚无配套整机固件、接线验收或实物端到端测试。** 本协议提供 B 的 LCD/触摸/摄像头/板载麦克风/功放整合输入输出契约，不宣称把 `usb_lcd_test`、`usb_touch_test` 或媒体试验工程合并了。保持原 v1 桥接和 v2 媒体脚本可用；v3 网关**只能搭配实现本文件的固件**，三者不能同时占用同一串口。无 Wi-Fi，电脑后端只监听本机地址。
+**状态：电脑网关、后端语音合成入口与离线替身测试已实现；尚无配套整机固件或实物端到端验证。** 本协议定义 LCD、触摸、摄像头、板载麦克风及功放的可选 USB 输入输出契约。v1 桥接、v2 媒体试验与 v3 网关是不同方案，不能同时占用同一串口；v3 网关只能搭配实现本协议的固件。无 Wi-Fi，电脑后端只监听本机地址。
 
 ## 通道和边界
 
@@ -29,7 +29,7 @@
 {"v":3,"type":"action","requestId":"tap-001","routineId":"care-1","expectedStep":0,"action":"confirm"}
 ```
 
-网关使用绑定用户的设备 token 调后端动作接口，回 `state` + 匹配的 `requestId` 和 `eventId`（仅有确认才可能非空）；等待回执期间锁住同一操作。`STEP_CHANGED`、`ROUTINE_NOT_ACTIVE` 等只返回 `{"v":3,"type":"error","code":"STEP_CHANGED"}`，板端须重查状态，**不自动把旧触摸应用到新步骤**。重复投递只重用原 ID；后端负责同编号幂等，板端点击时不能先画成完成。组员 H04 固件和正式 v1 桥接还未合入本协议。
+网关使用绑定用户的设备 token 调后端动作接口，回 `state` + 匹配的 `requestId` 和 `eventId`（仅有确认才可能非空）；等待回执期间锁住同一操作。`STEP_CHANGED`、`ROUTINE_NOT_ACTIVE` 等只返回 `{"v":3,"type":"error","code":"STEP_CHANGED"}`，板端须重查状态，**不自动把旧触摸应用到新步骤**。重复投递只重用原 ID；后端负责同编号幂等，板端点击时不能先画成完成。
 
 ## 摄像头、麦克风：上行
 
@@ -57,13 +57,13 @@
 
 ## 执行与验收范围
 
-电脑端离线测试：`python -m unittest discover -s tests -p usb_unified_test.py -v`、`npm test`。启动命令（**仅在 B 提供并编译 v3 配对固件后**）：`python scripts/usb-unified-gateway.py --port COM3 --token-file data/device-token.txt`。本机串口、token 和型号按实物核对。**不要把 v3 网关对着现有 H02/H03/H04 固件或媒体 v2 固件启动**，也不要让两个网关同时占口。
+电脑端离线测试：`python -m unittest discover -s tests -p usb_unified_test.py -v`、`npm test`。启动命令（**仅适用于完成配对与验证的 v3 固件**）：`python scripts/usb-unified-gateway.py --port COM3 --token-file data/device-token.txt`。串口、token 和型号按实物核对。不要把 v3 网关对着 v1 或媒体 v2 固件启动，也不要让两个网关同时占口。
 
-设备侧待 B 实现并测试：单一固件中的 LCD/触摸、上行媒体、下行音频的模式切换及拒绝并发、断线/取消、二进制校验、MP3 解码、I²S 播放。沿用现有 Sense 摄像头和 `10PI-AMP&MIC V3`，但触摸的 SDA/SCL/RST 与旧 I²S 测试脚位 5/6/43 冲突；**协议文档不是新的接线方案**，未复核当前实际接线和电源前不改线/烧录。设备实拍、录音、外部模型提交仍须用户逐次明确同意，和离线测试分别记证据。
+设备侧尚待实现并验证：单一固件中的 LCD/触摸、上行媒体、下行音频的模式切换及拒绝并发、断线/取消、二进制校验、MP3 解码、I²S 播放。可选 Sense 摄像头和 `10PI-AMP&MIC V3`，但触摸的 SDA/SCL/RST 与旧 I²S 测试脚位 5/6/43 可能冲突；**协议文档不是接线方案**，未复核实际接线和电源前不改线/烧录。设备实拍、录音、外部模型提交仍须用户逐次明确同意。
 
 | LCD 模拟器入口 | v3 框架现有输出 | 仍须补足 |
 | --- | --- | --- |
-| 护理状态与四动作 | `get/state/action` → 本人流程/后端事件 | 配对固件、触摸实测、正式 H04/H02 协议合并 |
+| 护理状态与四动作 | `get/state/action` → 本人流程/后端事件 | 配对固件与触摸实测 |
 | 识别包装 | `intent image` → 已校验 JPEG → `candidate_ready` 供直接展示 | 结果进入绑定用户客服会话的入口；实物采集/模型验收 |
 | 说句话 | `intent audio` → 已校验 WAV → `transcript_ready` 供直接展示 | 结果进入绑定用户客服会话的持久化入口；不能映射为护理指令 |
 | 重听/朗读 | `intent speak` → 绑定用户的已保存文字 → MP3 下行 | 板端 MP3 解码、播放/停止/重播和实际播放回执 |
