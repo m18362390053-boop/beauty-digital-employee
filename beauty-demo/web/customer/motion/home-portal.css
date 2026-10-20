@@ -72,6 +72,7 @@
 .portal-copy strong { color: #201e24; font-size: clamp(20px, 1.8vw, 25px); font-weight: 650; line-height: 1.2; letter-spacing: .015em; }
 .portal-copy small { margin-top: 7px; color: #343039; font-size: clamp(11px, 1vw, 13px); font-weight: 550; }
 .portal-blob[data-spec]::after { content: none; }
+/* Interaction note: hover, keyboard focus and chosen state use a bright, low-saturation crystal sheen; keep the labels dark and focus indication inside the blob. */
 .portal-blob:hover, .portal-blob:focus-visible { z-index: 3; scale: 1.025; }
 .portal-blob:hover img, .portal-blob:focus-visible img { opacity: 1; filter: brightness(1.26) saturate(.28) contrast(1.03) drop-shadow(0 13px 20px #35245d42) drop-shadow(0 0 17px #fffaffed); }
 .portal-blob:hover .portal-glint, .portal-blob:focus-visible .portal-glint { opacity: .9; }
@@ -100,6 +101,17 @@
   .portal-copy small { margin-top: 3px; font-size: clamp(10px, 2.7vw, 12px); }
   .portal-core { font-size: 9px; }
   .schedule-shortcut { font-size: 13px; }
+}
+@media (max-width: 540px) and (orientation: portrait) {
+  .home-portal { height: clamp(270px, 77vw, 320px); min-height: 270px; }
+  .portal-blob { width: 46%; height: 42%; }
+  .portal-blob--consult { left: 27%; }
+  .portal-blob--records { left: 0; }
+  .portal-blob--moment { right: 0; }
+  .portal-copy { inset: 17% 5%; }
+  .portal-copy strong { font-size: clamp(14px, 4vw, 17px); line-height: 1.22; }
+  .portal-copy small { max-width: 18ch; margin-top: 4px; font-size: clamp(10px, 2.8vw, 11px); line-height: 1.35; }
+  .portal-core { top: 51%; font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .portal-blob, .portal-blob img, .portal-glint, .portal-relations path { transition-duration: .01ms !important; }

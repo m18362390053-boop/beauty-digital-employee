@@ -4,6 +4,7 @@ import { createButterflyFlight } from './motion/butterfly-flight.js';
 import { initPointerLighting } from './motion/pointer-lighting.js';
 import { initHomePortal } from './motion/home-portal.js';
 import { initSkincareSchedule } from './skincare-schedule.js';
+import { createClientId } from './client-id.js';
 
 const $ = id => document.getElementById(id);
 const state = { csrf: '', productId: '', sessionId: '', sessions: [], card: null, abort: null, pending: null, videoPhotos: [], routine: null, careProducts: [], productPhoto: null, visionAbort: null, visionConfigured: false, imageProvider: null, asrConfigured: false, ttsConfigured: false, recorder: null, voice: null, voiceUrl: null, voiceAbort: null };
@@ -22,7 +23,7 @@ function renderView(view, focus = false) {
   $('schedule-view').hidden = !schedule;
   $('home-link').hidden = home;
   if (home) homePortal.reset();
-  document.title = consulting ? '在线咨询 · 暖颜' : schedule ? '护肤日程 · 暖颜' : '暖颜 · 专属美妆顾问';
+  document.title = consulting ? '在线咨询 · 悦见' : schedule ? '护肤日程 · 悦见' : '悦见 · 专属美妆顾问';
   if (focus && consulting) $('message').focus();
   if (focus && schedule) $('schedule-title').focus();
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -190,7 +191,7 @@ $('start-care').addEventListener('click', () => safely(async () => {
   if (!productIds.length || productIds.length > 3) { careNotice('请本人确认并选择 1–3 件产品。'); return; }
   $('start-care').disabled = true;
   try {
-    state.routine = await api('/api/customer/routines', 'POST', { requestId: crypto.randomUUID(), period: $('care-period').value, productIds, confirmed: true });
+    state.routine = await api('/api/customer/routines', 'POST', { requestId: createClientId(), period: $('care-period').value, productIds, confirmed: true });
     careNotice('已按你确认的产品建立流程；这不是图像识别结果。'); renderCare();
   } catch (error) { careNotice(error instanceof Error ? `未能开始：${error.message}` : '未能开始护理，请检查产品使用资料。'); }
   finally { renderCare(); }
@@ -203,7 +204,7 @@ $('care-controls').addEventListener('click', event => {
       stopVoice();
       const action = button.dataset.careAction;
       state.routine = await api(`/api/customer/routines/${state.routine.routineId}/actions`, 'POST', {
-        requestId: crypto.randomUUID(), expectedStep: state.routine.currentStep, action, source: 'screen',
+        requestId: createClientId(), expectedStep: state.routine.currentStep, action, source: 'screen',
       });
       careNotice(action === 'confirm' ? '这一阶段已由你确认并记录。' : action === 'skip' ? '已跳过；未记作完成。' : action === 'stop' ? '已停止。' : '正在显示当前步骤，没有推进。');
       renderCare(); await refreshCareEvents();
@@ -217,7 +218,7 @@ $('send-care-command').addEventListener('click', () => safely(async () => {
   try {
     stopVoice();
     state.routine = await api(`/api/customer/routines/${state.routine.routineId}/text-commands`, 'POST', {
-      requestId: crypto.randomUUID(), expectedStep: state.routine.currentStep, text: $('care-command').value.trim(),
+      requestId: createClientId(), expectedStep: state.routine.currentStep, text: $('care-command').value.trim(),
     });
     $('care-command').value = ''; careNotice('文字指令已处理；只有“好了”或“完成”会记录完成。');
     renderCare(); await refreshCareEvents();
@@ -496,7 +497,7 @@ $('send-form').addEventListener('submit', event => { event.preventDefault(); saf
   if (state.abort) return;
   const content = $('message').value.trim(); if (!content) return;
   if (!state.sessionId && !await newSession()) return;
-  const attempt = { sessionId: state.sessionId, requestId: crypto.randomUUID() }; pending(attempt);
+  const attempt = { sessionId: state.sessionId, requestId: createClientId() }; pending(attempt);
   state.abort = new AbortController(); $('send').disabled = true; $('cancel').disabled = false; renderSessions(); $('new-session').disabled = true; notice('正在理解你的问题、核对可用资料…');
   try {
     const result = await api(`${path()}/consult`, 'POST', { requestId: attempt.requestId, content }, state.abort.signal);
