@@ -94,7 +94,7 @@ test('speech adapters require consent, reject malformed audio, and never execute
     assert.equal((options?.headers as Record<string, string>)['X-Api-Resource-Id'], 'seed-tts-2.0');
     const body = JSON.parse(String(options?.body)); assert.equal(body.req_params.speaker, 'fixture-speaker');
     const chunk = Buffer.from([0x49, 0x44, 0x33, 0, 0]);
-    return new Response(`{"code":0,"data":"${chunk.toString('base64')}"}\n{"code":0}\n`);
+    return new Response(`{"code":0,"data":"${chunk.toString('base64')}"}\n{"code":20000000}\n`);
   });
   const signal = new AbortController().signal;
   await assert.rejects(() => service.transcribe({ ...audio, authorized: false }, signal));
@@ -107,6 +107,20 @@ test('speech adapters require consent, reject malformed audio, and never execute
   assert.equal(requests, 2);
   const empty = new SpeechService();
   assert.equal(empty.settings.asrReady(), false); assert.equal(empty.settings.ttsReady(), false);
+});
+
+test('TTS requires a successful V3 terminal frame and rejects failed or truncated streams', async () => {
+  const audioFrame = `{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}`;
+  for (const stream of [
+    `${audioFrame}\n`,
+    `${audioFrame}\n{"code":45000001}\n`,
+    '{"code":20000000}\n',
+    `${audioFrame}\n{"code":20000000}\n${audioFrame}\n`,
+  ]) {
+    const speech = new SpeechService(volc, async () => new Response(stream));
+    await assert.rejects(() => speech.synthesize({ authorized: true, text: '您好' }, new AbortController().signal),
+      (error: unknown) => error instanceof Error && error.message === 'TTS_INVALID_RESPONSE');
+  }
 });
 
 test('speech HTTP endpoints require identity, CSRF, consent; unconfigured calls do not leave the server', async () => {
@@ -147,7 +161,7 @@ test('TTS HTTP only reads the current step or owned saved answer, never arbitrar
   const speech = new SpeechService(volc, async (_url, options) => {
     calls++; const body = JSON.parse(String(options?.body));
     assert.ok(['已保存的测试回复', '用这款虚构演示洁面按演示说明轻柔清洁，再用清水洗净。实际产品请以包装为准。'].includes(body.req_params.text));
-    return new Response(`{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}\n`);
+    return new Response(`{"code":0,"data":"${Buffer.from('ID3').toString('base64')}"}\n{"code":20000000}\n`);
   });
   const server = createApp(store, new CustomerService(store), { access: testAccess(store), speech }).listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));

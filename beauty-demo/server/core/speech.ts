@@ -53,13 +53,20 @@ export class SpeechService {
     // The HTTP chunked endpoint emits JSON records containing base64 audio fragments.
     const reader = response.body?.getReader();
     if (!reader) throw new ProviderError('TTS_INVALID_RESPONSE');
-    const chunks: Buffer[] = []; let pending = ''; let size = 0;
+    const chunks: Buffer[] = []; let pending = ''; let size = 0; let finished = false;
     const consume = (line: string) => {
       if (!line.trim()) return;
       let record: unknown;
       try { record = JSON.parse(line); } catch { throw new ProviderError('TTS_INVALID_RESPONSE'); }
-      const parsed = z.object({ code: z.number(), data: z.string().optional() }).safeParse(record);
-      if (!parsed.success || parsed.data.code !== 0) throw new ProviderError('TTS_INVALID_RESPONSE');
+      const parsed = z.object({ code: z.number(), data: z.string().nullish() }).safeParse(record);
+      if (!parsed.success || finished) throw new ProviderError('TTS_INVALID_RESPONSE');
+      // V3 Chunked sends audio with code=0 and a separate successful terminal
+      // frame with code=20000000. It is not an upstream failure.
+      if (parsed.data.code === 20000000) {
+        if (!chunks.length || parsed.data.data) throw new ProviderError('TTS_INVALID_RESPONSE');
+        finished = true; return;
+      }
+      if (parsed.data.code !== 0) throw new ProviderError('TTS_INVALID_RESPONSE');
       if (parsed.data.data) {
         let audio: Buffer;
         try { audio = decodedMedia(parsed.data.data, 2_000_000); } catch { throw new ProviderError('TTS_INVALID_RESPONSE'); }
@@ -98,7 +105,7 @@ export class SpeechService {
       if (error instanceof ProviderError) throw error;
       throw new ProviderError(signal.aborted ? 'TTS_CANCELLED' : deadline.aborted ? 'TTS_TIMEOUT' : 'TTS_UNAVAILABLE');
     } finally { await reader.cancel().catch(() => {}); }
-    if (!chunks.length) throw new ProviderError('TTS_INVALID_RESPONSE');
+    if (!chunks.length || !finished) throw new ProviderError('TTS_INVALID_RESPONSE');
     return { mediaType: 'audio/mpeg', dataBase64: Buffer.concat(chunks).toString('base64') };
   }
 }

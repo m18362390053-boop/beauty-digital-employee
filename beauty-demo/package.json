@@ -9,7 +9,7 @@
     "dev": "tsx watch server/index.ts",
     "dev:mobile": "sh scripts/start-mobile-preview.sh",
     "start": "node dist/server/index.js",
-    "test": "npm run build && node --test dist/tests/foundation.test.js dist/tests/mcp.test.js dist/tests/workflow.test.js dist/tests/local-runtime.test.js dist/tests/authoring.test.js dist/tests/provider-network.test.js dist/tests/access.test.js dist/tests/routines.test.js dist/tests/product-vision.test.js dist/tests/volcano-speech.test.js",
+    "test": "npm run build && node --test dist/tests/foundation.test.js dist/tests/mcp.test.js dist/tests/workflow.test.js dist/tests/local-runtime.test.js dist/tests/authoring.test.js dist/tests/provider-network.test.js dist/tests/access.test.js dist/tests/routines.test.js dist/tests/product-vision.test.js dist/tests/volcano-speech.test.js dist/tests/device-media.test.js",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "sync:recommendation-demo": "tsx scripts/sync-recommendation-demo.ts",
     "sync:face-guide-demo": "tsx scripts/sync-face-guide-demo.ts",

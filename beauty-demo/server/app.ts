@@ -14,6 +14,7 @@ import { skillVersionSchema } from './core/workflow-types.js';
 import { Routines } from './core/routines.js';
 import { ProductVision } from './core/product-vision.js';
 import { SpeechService } from './core/speech.js';
+import { ProviderError } from './core/providers.js';
 import { CarePlans } from './core/care-plans.js';
 
 const param = (req: Request, name: string) => idSchema.parse(req.params[name]);
@@ -50,6 +51,7 @@ export function createApp(store: Store, service = new CustomerService(store), op
   // capped again by their endpoint, but need more room than an ordinary chat payload.
   app.use(express.json({ limit: '18mb' }));
   app.use('/chat', express.static(resolve('web/customer'), { index: 'index.html' }));
+  app.use('/lcd-demo', express.static(resolve('web/lcd-demo'), { index: 'index.html' }));
   app.use('/ops', express.static(resolve('web/operator'), { index: 'index.html' }));
   app.use('/shared', express.static(resolve('web/shared')));
 
@@ -68,6 +70,52 @@ export function createApp(store: Store, service = new CustomerService(store), op
   });
   app.post('/api/auth/operator/logout', (req, res) => { access.logout(req, res); res.json({ authenticated: false }); });
   mountCustomerApi(app, store, service, access, routines, options.vision ?? new ProductVision(store, service.modelSettings), options.speech ?? new SpeechService());
+  // Explicitly authorised one-shot USB captures. Device media is not a chat message or care action.
+  const deviceVision = options.vision ?? new ProductVision(store, service.modelSettings);
+  const deviceSpeech = options.speech ?? new SpeechService();
+  app.post('/api/device/media/image/recognize', async (req, res) => {
+    access.requireDevice(req);
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceVision.recognize(req.body, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '图片模型暂不可用。'); throw error; }
+    finally { res.off('close', close); }
+  });
+  app.post('/api/device/media/audio/transcribe', async (req, res) => {
+    access.requireDevice(req);
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceSpeech.transcribe(req.body, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '转写模型暂不可用。'); throw error; }
+    finally { res.off('close', close); }
+  });
+  // Device speech is sourced from the bound user's current step or saved answer;
+  // the board cannot provide arbitrary text for paid synthesis.
+  app.post('/api/device/speech/synthesize', async (req, res) => {
+    const userId = access.requireDevice(req);
+    const source = z.object({ authorized: z.literal(true), routineId: idSchema.optional(), messageId: idSchema.optional() }).strict()
+      .refine(value => Number(Boolean(value.routineId)) + Number(Boolean(value.messageId)) === 1).parse(req.body);
+    let text: string;
+    if (source.routineId) {
+      const run = routines.get(userId, source.routineId);
+      if (run.status !== 'active' || !run.current) throw new AppError(409, 'ROUTINE_NOT_ACTIVE', '没有可朗读的当前步骤。');
+      text = run.current.instruction;
+    } else {
+      const row = store.db.prepare(`SELECT m.role,m.content,m.metadata FROM messages m
+        JOIN sessions s ON s.id=m.session_id WHERE m.id=? AND s.user_id=?`)
+        .get(source.messageId!, userId) as { role: string; content: string; metadata: string } | undefined;
+      if (!row || !['assistant', 'human'].includes(row.role)
+        || ['degraded', 'cancelled', 'interrupted'].includes((JSON.parse(row.metadata) as { status?: string }).status ?? '')) {
+        throw new AppError(404, 'SPEAK_SOURCE_NOT_FOUND', '没有可朗读的本人回复。');
+      }
+      text = row.content;
+    }
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceSpeech.synthesize({ authorized: true, text }, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '播报服务暂不可用，请阅读屏幕文字。'); throw error; }
+    finally { res.off('close', close); }
+  });
   // The gateway uses a user-bound, device-only token; never the operator password or model keys.
   app.get('/api/device/routines/current', (req, res) => res.json({ routine: routines.current(access.requireDevice(req)) }));
   app.post('/api/device/routines/:routineId/actions', (req, res) => {
