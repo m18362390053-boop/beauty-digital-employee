@@ -1,0 +1,14 @@
+[
+  {
+    "productId": "demo-lip-rose", "name": "演示口红 A · 柔和玫瑰", "version": "demo-v2", "dataKind": "demo",
+    "recommendation": { "category": "口红", "shade": "柔和玫瑰色", "texture": "滋润质地", "keywords": ["自然", "温柔", "润", "唇色深"], "sourceId": "demo-lip-rose-source" },
+    "sources": [{ "sourceId": "demo-lip-rose-source", "title": "虚构演示口红 A 资料", "locator": "demo://fixtures/lip-rose", "collectedAt": "2026-09-30T00:00:00Z" }],
+    "facts": [{ "factId": "demo-lip-rose-fact", "category": "description", "text": "虚构演示口红 A 的示例色调为柔和玫瑰色，示例质地为滋润；仅用于测试商品卡，不代表真实在售商品或效果。", "sourceId": "demo-lip-rose-source", "reviewStatus": "approved" }]
+  },
+  {
+    "productId": "demo-lip-bean", "name": "演示口红 B · 低饱和豆沙", "version": "demo-v2", "dataKind": "demo",
+    "recommendation": { "category": "口红", "shade": "低饱和豆沙色", "texture": "柔雾质地", "keywords": ["自然", "气质", "豆沙", "唇色深"], "sourceId": "demo-lip-bean-source" },
+    "sources": [{ "sourceId": "demo-lip-bean-source", "title": "虚构演示口红 B 资料", "locator": "demo://fixtures/lip-bean", "collectedAt": "2026-09-30T00:00:00Z" }],
+    "facts": [{ "factId": "demo-lip-bean-fact", "category": "description", "text": "虚构演示口红 B 的示例色调为低饱和豆沙色，示例质地为柔雾；仅用于测试商品卡，不代表真实在售商品或效果。", "sourceId": "demo-lip-bean-source", "reviewStatus": "approved" }]
+  }
+]

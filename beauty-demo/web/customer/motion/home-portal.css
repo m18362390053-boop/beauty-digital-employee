@@ -1,0 +1,108 @@
+/* Three service entrances adapted from UI参考's organic map, without its routing or data. */
+.customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero {
+  grid-template-columns: minmax(285px, .82fr) minmax(0, 1.18fr);
+  min-height: 550px;
+  padding: 42px 32px 42px 48px;
+  overflow: visible;
+}
+.customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero {
+  grid-template-columns: minmax(355px, .94fr) minmax(0, 1.06fr);
+}
+.customer-page:has(#home-view:not([hidden])) .customer-hero h1 {
+  font-size: clamp(32px, 3.6vw, 46px);
+  letter-spacing: .005em;
+}
+.customer-home .hero-copy { align-self: center; }
+.customer-home .hero-lede { max-width: 34ch; }
+.customer-home .hero-assurance { max-width: 35ch; }
+.schedule-shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #e7d8e0a8;
+  border-radius: 0;
+  background: transparent;
+  color: #fff5dd;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+.schedule-shortcut:hover { color: #fff; border-color: #fff; background: transparent; }
+.schedule-shortcut:focus-visible { outline: 2px solid #fff4d6; outline-offset: 5px; }
+.home-portal { position: relative; width: 100%; max-width: 620px; height: 460px; margin-inline: auto; isolation: isolate; }
+.portal-relations { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.portal-relations path { fill: none; stroke: #f4e9d66b; stroke-width: 1.1; stroke-dasharray: 3 9; transition: stroke .32s ease, stroke-width .32s ease, opacity .32s ease; }
+.home-portal[data-portal-hover="consult"] .portal-relations path:nth-child(1),
+.home-portal[data-portal-hover="consult"] .portal-relations path:nth-child(2),
+.home-portal[data-portal-hover="records"] .portal-relations path:nth-child(1),
+.home-portal[data-portal-hover="moment"] .portal-relations path:nth-child(2) { stroke: #fff5dfc9; stroke-width: 1.7; stroke-dasharray: none; }
+.portal-core { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); color: #f7f0e0c7; font-size: 11px; line-height: 1.55; letter-spacing: .08em; text-align: center; }
+.portal-blob {
+  --blob-shift-x: 0px;
+  --blob-shift-y: 0px;
+  position: absolute !important;
+  display: block;
+  width: 44%;
+  height: 42%;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #29262a !important;
+  cursor: pointer;
+  isolation: isolate;
+  overflow: visible !important;
+  text-align: center;
+  transition: opacity .38s ease, filter .38s ease, scale .48s cubic-bezier(.2,.72,.2,1) !important;
+}
+.portal-blob--consult { left: 27%; top: 2%; view-transition-name: portal-consult; }
+.portal-blob--records { left: 1%; bottom: 2%; view-transition-name: portal-records; }
+.portal-blob--moment { right: 1%; bottom: 2%; view-transition-name: portal-moment; }
+.portal-blob img { position: absolute; inset: -4% -4%; width: 108%; height: 108%; object-fit: fill; pointer-events: none; opacity: .92; filter: brightness(.96) saturate(.88) drop-shadow(0 9px 14px #20162545); transform: translate(var(--blob-shift-x), var(--blob-shift-y)); transition: opacity .3s, filter .44s cubic-bezier(.16,1,.3,1), transform .3s; }
+.portal-glint { position: absolute; inset: -4% -4%; width: 108%; height: 108%; pointer-events: none; opacity: 0; background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #ffffffed 0, #fffaffb8 17%, #f3f0ff70 31%, transparent 48%); -webkit-mask: var(--portal-mask) center / 100% 100% no-repeat; mask: var(--portal-mask) center / 100% 100% no-repeat; mix-blend-mode: screen; transition: opacity .38s ease; }
+.portal-blob--consult { --portal-mask: url('/chat/assets/blob-into.png'); }
+.portal-blob--records { --portal-mask: url('/chat/assets/blob-for.png'); }
+.portal-blob--moment { --portal-mask: url('/chat/assets/blob-through.png'); }
+.portal-copy { position: absolute; inset: 20% 16%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.portal-copy strong { color: #201e24; font-size: clamp(20px, 1.8vw, 25px); font-weight: 650; line-height: 1.2; letter-spacing: .015em; }
+.portal-copy small { margin-top: 7px; color: #343039; font-size: clamp(11px, 1vw, 13px); font-weight: 550; }
+.portal-blob[data-spec]::after { content: none; }
+.portal-blob:hover, .portal-blob:focus-visible { z-index: 3; scale: 1.025; }
+.portal-blob:hover img, .portal-blob:focus-visible img { opacity: 1; filter: brightness(1.26) saturate(.28) contrast(1.03) drop-shadow(0 13px 20px #35245d42) drop-shadow(0 0 17px #fffaffed); }
+.portal-blob:hover .portal-glint, .portal-blob:focus-visible .portal-glint { opacity: .9; }
+.portal-blob:active:not(.is-chosen) { scale: .99; }
+.portal-blob:focus-visible { outline: none; }
+.home-portal[data-portal-active]:not([data-portal-active=""]) .portal-blob:not(.is-chosen) { opacity: .68; filter: saturate(.82); scale: .99; }
+.home-portal .portal-blob.is-chosen { z-index: 4; scale: 1.04; }
+.home-portal .portal-blob.is-chosen img { opacity: 1; filter: brightness(1.26) saturate(.28) contrast(1.03) drop-shadow(0 14px 21px #35245d45) drop-shadow(0 0 18px #fffafff2); }
+.home-portal .portal-blob.is-chosen .portal-glint { opacity: .94; }
+.portal-blob .butterfly-anchor { right: 20%; top: 20%; }
+::view-transition-group(portal-consult), ::view-transition-group(portal-records), ::view-transition-group(portal-moment) { animation-duration: .48s; animation-timing-function: cubic-bezier(.2,.72,.2,1); }
+
+@media (max-width: 900px) {
+  .customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero { grid-template-columns: 1fr; min-height: 0; padding: 32px 26px 24px; }
+  .customer-home .hero-copy { align-self: auto; }
+  .customer-home .hero-lede { max-width: 58ch; }
+  .home-portal { height: min(61vw, 410px); max-width: 590px; margin-top: 10px; }
+}
+@media (max-width: 540px) {
+  .customer-page:has(#home-view:not([hidden])) .customer-home .customer-hero { padding: 25px 18px 18px; overflow: hidden; }
+  .customer-page:has(#home-view:not([hidden])) .customer-hero h1 { font-size: clamp(30px, 7.5vw, 37px); }
+  .home-portal { height: min(80vw, 335px); min-height: 270px; margin-top: 6px; }
+  .portal-blob { width: 44%; height: 42%; }
+  .portal-blob--consult { left: 28%; }
+  .portal-copy strong { font-size: clamp(16px, 4.1vw, 20px); }
+  .portal-copy small { margin-top: 3px; font-size: clamp(10px, 2.7vw, 12px); }
+  .portal-core { font-size: 9px; }
+  .schedule-shortcut { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal-blob, .portal-blob img, .portal-glint, .portal-relations path { transition-duration: .01ms !important; }
+  .portal-blob:hover, .portal-blob:focus-visible { scale: 1; }
+  .home-portal .portal-blob.is-chosen { scale: 1.02; }
+}

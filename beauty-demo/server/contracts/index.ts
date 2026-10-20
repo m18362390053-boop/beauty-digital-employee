@@ -31,6 +31,12 @@ export const productSchema = z.object({
   name: shortText,
   version: idSchema,
   dataKind: z.enum(['demo', 'business']),
+  recommendation: z.object({
+    category: shortText, shade: shortText, texture: shortText,
+    keywords: z.array(shortText).min(1).max(20), sourceId: idSchema,
+    imageUrl: z.string().url().refine(value => new URL(value).protocol === 'https:', 'Use an HTTPS image URL').optional(),
+    price: z.number().nonnegative().optional(),
+  }).strict().optional(),
   sources: z.array(sourceSchema).min(1).max(100),
   facts: z.array(z.object({
     factId: idSchema,
@@ -46,6 +52,9 @@ export const productSchema = z.object({
   value.facts.forEach((fact, i) => {
     if (!sources.has(fact.sourceId)) ctx.addIssue({ code: 'custom', path: ['facts', i, 'sourceId'], message: 'Unknown sourceId' });
   });
+  if (value.recommendation && !value.facts.some(fact => fact.sourceId === value.recommendation!.sourceId && fact.reviewStatus === 'approved')) {
+    ctx.addIssue({ code: 'custom', path: ['recommendation', 'sourceId'], message: 'Recommendation requires an approved fact from its declared source' });
+  }
 });
 export type ProductDocument = z.infer<typeof productSchema>;
 

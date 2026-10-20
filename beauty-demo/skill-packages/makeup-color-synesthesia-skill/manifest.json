@@ -1,0 +1,10 @@
+{
+  "id": "makeup-color-synesthesia-skill",
+  "version": "v1.3.0",
+  "description": "为希望用自然口语理解彩妆和护肤商品的用户提供可核验、尊重偏好的中文导购，尤其适合45岁以上及存在色觉差异的用户",
+  "intents": ["product_advice", "safety"],
+  "knowledgeScopes": ["product", "comment_insights"],
+  "requiredFields": [],
+  "requiresKnowledge": true,
+  "recommendation": { "category": "口红", "maxClarifications": 1 }
+}

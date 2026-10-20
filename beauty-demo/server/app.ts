@@ -11,6 +11,11 @@ import { SkillPackages } from './core/skill-packages.js';
 import { AccessControl } from './access.js';
 import { mountCustomerApi } from './customer-api.js';
 import { skillVersionSchema } from './core/workflow-types.js';
+import { Routines } from './core/routines.js';
+import { ProductVision } from './core/product-vision.js';
+import { SpeechService } from './core/speech.js';
+import { ProviderError } from './core/providers.js';
+import { CarePlans } from './core/care-plans.js';
 
 const param = (req: Request, name: string) => idSchema.parse(req.params[name]);
 const pagination = z.object({
@@ -18,9 +23,10 @@ const pagination = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 }).strict();
 
-export function createApp(store: Store, service = new CustomerService(store), options: { access?: AccessControl } = {}) {
+export function createApp(store: Store, service = new CustomerService(store), options: { access?: AccessControl; vision?: ProductVision; speech?: SpeechService } = {}) {
   const app = express();
   const access = options.access ?? new AccessControl(store);
+  const routines = new Routines(store);
   app.disable('x-powered-by');
   if (process.env.BEAUTY_TRUST_PROXY === '1') app.set('trust proxy', 'loopback');
   app.use((_req, res, next) => {
@@ -41,8 +47,11 @@ export function createApp(store: Store, service = new CustomerService(store), op
     if (req.headers['sec-fetch-site'] === 'cross-site') throw new AppError(403, 'ORIGIN_NOT_ALLOWED', 'Cross-site requests are disabled');
     next();
   });
-  app.use(express.json({ limit: '8mb' }));
+  // Customer-authorised video-moment photo batches are compressed in the browser and
+  // capped again by their endpoint, but need more room than an ordinary chat payload.
+  app.use(express.json({ limit: '18mb' }));
   app.use('/chat', express.static(resolve('web/customer'), { index: 'index.html' }));
+  app.use('/lcd-demo', express.static(resolve('web/lcd-demo'), { index: 'index.html' }));
   app.use('/ops', express.static(resolve('web/operator'), { index: 'index.html' }));
   app.use('/shared', express.static(resolve('web/shared')));
 
@@ -60,24 +69,91 @@ export function createApp(store: Store, service = new CustomerService(store), op
     res.json(access.login(req, res, password));
   });
   app.post('/api/auth/operator/logout', (req, res) => { access.logout(req, res); res.json({ authenticated: false }); });
-  mountCustomerApi(app, store, service, access);
+  mountCustomerApi(app, store, service, access, routines, options.vision ?? new ProductVision(store, service.modelSettings), options.speech ?? new SpeechService());
+  // Explicitly authorised one-shot USB captures. Device media is not a chat message or care action.
+  const deviceVision = options.vision ?? new ProductVision(store, service.modelSettings);
+  const deviceSpeech = options.speech ?? new SpeechService();
+  app.post('/api/device/media/image/recognize', async (req, res) => {
+    access.requireDevice(req);
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceVision.recognize(req.body, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '图片模型暂不可用。'); throw error; }
+    finally { res.off('close', close); }
+  });
+  app.post('/api/device/media/audio/transcribe', async (req, res) => {
+    access.requireDevice(req);
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceSpeech.transcribe(req.body, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '转写模型暂不可用。'); throw error; }
+    finally { res.off('close', close); }
+  });
+  // Device speech is sourced from the bound user's current step or saved answer;
+  // the board cannot provide arbitrary text for paid synthesis.
+  app.post('/api/device/speech/synthesize', async (req, res) => {
+    const userId = access.requireDevice(req);
+    const source = z.object({ authorized: z.literal(true), routineId: idSchema.optional(), messageId: idSchema.optional() }).strict()
+      .refine(value => Number(Boolean(value.routineId)) + Number(Boolean(value.messageId)) === 1).parse(req.body);
+    let text: string;
+    if (source.routineId) {
+      const run = routines.get(userId, source.routineId);
+      if (run.status !== 'active' || !run.current) throw new AppError(409, 'ROUTINE_NOT_ACTIVE', '没有可朗读的当前步骤。');
+      text = run.current.instruction;
+    } else {
+      const row = store.db.prepare(`SELECT m.role,m.content,m.metadata FROM messages m
+        JOIN sessions s ON s.id=m.session_id WHERE m.id=? AND s.user_id=?`)
+        .get(source.messageId!, userId) as { role: string; content: string; metadata: string } | undefined;
+      if (!row || !['assistant', 'human'].includes(row.role)
+        || ['degraded', 'cancelled', 'interrupted'].includes((JSON.parse(row.metadata) as { status?: string }).status ?? '')) {
+        throw new AppError(404, 'SPEAK_SOURCE_NOT_FOUND', '没有可朗读的本人回复。');
+      }
+      text = row.content;
+    }
+    const abort = new AbortController(); const close = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', close);
+    try { res.json(await deviceSpeech.synthesize({ authorized: true, text }, abort.signal)); }
+    catch (error) { if (error instanceof ProviderError) throw new AppError(503, error.code, '播报服务暂不可用，请阅读屏幕文字。'); throw error; }
+    finally { res.off('close', close); }
+  });
+  // The gateway uses a user-bound, device-only token; never the operator password or model keys.
+  app.get('/api/device/routines/current', (req, res) => res.json({ routine: routines.current(access.requireDevice(req)) }));
+  app.post('/api/device/routines/:routineId/actions', (req, res) => {
+    const userId = access.requireDevice(req);
+    const value = z.object({ requestId: idSchema, expectedStep: z.number().int().nonnegative(),
+      action: z.enum(['confirm', 'repeat', 'skip', 'stop']), feeling: z.string().trim().max(200).optional() }).strict().parse(req.body);
+    res.json(routines.act(userId, idSchema.parse(req.params.routineId), { ...value, source: 'device_button' }));
+  });
   app.use('/api', access.guard);
   app.post('/api/ops/mcp-credentials', (req, res) => {
     const { userId } = z.object({ userId: idSchema }).strict().parse(req.body);
     res.json(access.issueMcp(userId));
   });
+  app.post('/api/ops/device-credentials', (req, res) => {
+    const { userId } = z.object({ userId: idSchema }).strict().parse(req.body);
+    res.json(access.issueDevice(userId));
+  });
+  app.delete('/api/ops/device-credentials/:userId', (req, res) =>
+    res.json(access.revokeDevices(param(req, 'userId'))));
   app.get('/api/status', (_req, res) => res.json(service.status()));
   app.post('/api/setup/demo', (_req, res) => {
-    if (store.listProducts().some(p => p.productId !== 'demo-product' || p.dataKind !== 'demo')) {
+    if (store.listProducts().some(p => p.dataKind !== 'demo')) {
       throw new AppError(409, 'BUSINESS_DATA_PRESENT', '已有业务产品，不能导入演示产品覆盖。');
     }
     const load = (name: string) => JSON.parse(readFileSync(resolve('content/templates', name), 'utf8'));
     store.importProduct(load('product.demo.json'));
+    for (const product of load('catalog.demo.json')) store.importProduct(product);
+    for (const product of load('routine.demo.json')) store.importProduct(product);
     store.importComments(load('comments.demo.json'));
     const users = store.listUsers();
     for (const userId of ['demo-user-a', 'demo-user-b']) if (!users.some(user => user.userId === userId)) store.createUser({ userId, displayName: `演示用户 ${userId.slice(-1).toUpperCase()}` });
     res.json({ status: 'ready', dataKind: 'demo' });
   });
+  app.get('/api/ops/care-plans', (_req, res) => res.json({ items: new CarePlans(store).list() }));
+  app.post('/api/ops/care-plans', (req, res) => res.status(201).json(new CarePlans(store).import(req.body)));
+  app.get('/api/ops/modality-events', (_req, res) => res.json({ items: store.db.prepare(`SELECT id AS eventId,user_id AS userId,
+    modality,provider,status,code,created_at AS createdAt FROM modality_events ORDER BY created_at DESC LIMIT 100`).all() }));
+  app.get('/api/ops/routine-actions', (_req, res) => res.json({ items: routines.operatorActions() }));
   app.get('/api/settings/models', (_req, res) => res.json(service.modelSettings.publicView()));
   app.put('/api/settings/models', (req, res) => res.json(service.configureModels(req.body)));
   app.post('/api/settings/models/check', async (_req, res) => res.json(await service.checkModels()));
@@ -153,6 +229,7 @@ export function createApp(store: Store, service = new CustomerService(store), op
   app.get('/api/dashboard', (_req, res) => res.json(service.workflows.dashboard()));
   app.get('/api/ops/runs', (_req, res) => res.json({ items: service.workflows.listRuns() }));
   app.get('/api/ops/runs/:runId', (req, res) => res.json(service.workflows.runDetail(param(req, 'runId'))));
+  app.get('/api/ops/care-events', (_req, res) => res.json({ items: routines.operatorTimeline() }));
   app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Endpoint not found')));
   const errors: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
     const traceId = res.locals.traceId as string;

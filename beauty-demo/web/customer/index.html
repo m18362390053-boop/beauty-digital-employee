@@ -1,18 +1,138 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>专属美妆顾问</title><link rel="stylesheet" href="/shared/styles.css"><script type="module" src="/chat/app.js"></script></head>
-<body>
-  <header class="customer-shell"><div><div class="eyebrow">YOUR BEAUTY COMPANION</div><h1>你好，很高兴为你服务。</h1><p>聊聊产品、使用感受，或让我们帮你联系人工。</p></div><span id="service-status" class="badge">连接中</span></header>
-  <main class="customer-shell">
-    <div id="customer-notice" class="notice" role="status" aria-live="polite"></div>
-    <div class="toolbar"><label class="grow">我的咨询记录<select id="sessions" aria-label="我的咨询记录"></select></label><button id="new-session">开始新咨询</button><span id="session-state" class="badge"></span></div>
-    <article class="panel">
-      <div id="messages" class="customer-messages" aria-live="polite"></div>
-      <form id="send-form"><label for="message">想问些什么？</label><textarea id="message" rows="3" maxlength="10000" placeholder="例如：想了解这款产品怎么使用。" required></textarea><div class="actions"><button id="send" class="primary">发送</button><button id="cancel" type="button" disabled>停止等待</button><button id="human" type="button">联系人工</button><button id="check" type="button" hidden>查看上次处理结果</button></div></form>
-    </article>
-    <details class="panel" id="profile"><summary>我的偏好与资料</summary><p class="small muted">只保存你确认的信息，用于下次提供更贴合的服务。可随时在这里修改或清空。</p>
-      <form id="card-form"><label for="preferences">偏好（每行一项）</label><textarea id="preferences" rows="2" placeholder="例如：喜欢清爽的质地"></textarea><label for="concerns">关注点（每行一项）</label><textarea id="concerns" rows="2"></textarea><div id="facts"></div><button class="primary">保存我的资料</button></form>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fbf3fc">
+  <title>专属美妆顾问</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <link rel="stylesheet" href="/chat/customer.css">
+  <link rel="stylesheet" href="/chat/motion/v3-motion.css">
+  <link rel="stylesheet" href="/chat/motion/home-portal.css">
+  <script type="module" src="/chat/app.js"></script>
+</head>
+<body class="customer-page">
+  <div id="motion-butterfly" class="motion-butterfly" aria-hidden="true" hidden><img src="/chat/assets/butterfly-flight.png" alt=""></div>
+  <div class="customer-page-grid" aria-hidden="true"></div>
+  <header class="customer-shell customer-header">
+    <a class="customer-brand" href="#home" aria-label="返回首页"><span class="brand-mark" aria-hidden="true">✦</span><span>暖颜<span class="brand-en">BEAUTY COMPANION</span></span></a>
+    <div class="customer-header-actions"><button id="home-link" type="button" class="header-link" hidden>返回首页</button><span id="service-status" class="badge customer-status">连接中</span></div>
+  </header>
+  <main class="customer-shell customer-main">
+    <section class="customer-home" id="home-view" aria-label="欢迎首页">
+    <div class="customer-hero" aria-labelledby="welcome-title">
+      <span class="butterfly-anchor" data-butterfly-anchor="home" aria-hidden="true"></span>
+      <div class="hero-copy">
+        <p class="hero-kicker"><span class="hero-kicker-line"></span>温柔陪伴 · 清楚解答</p>
+        <h1 id="welcome-title">护肤不必懂术语，<br><em>慢慢聊，就会明白。</em></h1>
+        <p class="hero-lede">想知道护肤品怎么用、脸上的部位在哪里，或者只想问一句，都可以从这里开始。</p>
+        <p class="hero-assurance">看图认部位 · 用白话说明 · 随时可找人工</p>
+      </div>
+      <div class="home-portal" aria-label="选择服务" data-portal-active="">
+        <svg class="portal-relations" viewBox="0 0 620 510" preserveAspectRatio="none" aria-hidden="true"><path d="M287 208 C230 244 184 274 151 315"/><path d="M333 208 C390 244 436 274 469 315"/></svg>
+        <button id="start-consultation" class="portal-blob portal-blob--consult" type="button" data-portal="consult" data-liquid-blob data-spec><img src="/chat/assets/blob-into.png" alt=""><span class="portal-glint" aria-hidden="true"></span><span class="portal-copy"><strong>开始咨询</strong><small>不懂术语也能问</small></span></button>
+        <button id="view-records" class="portal-blob portal-blob--records" type="button" data-portal="records" data-liquid-blob data-spec><img src="/chat/assets/blob-for.png" alt=""><span class="portal-glint" aria-hidden="true"></span><span class="portal-copy"><strong>查看护肤日程</strong><small>看看今天的护理和记录</small></span></button>
+        <button id="start-video-moment" class="portal-blob portal-blob--moment" type="button" data-portal="moment" data-liquid-blob data-spec><img src="/chat/assets/blob-through.png" alt=""><span class="portal-glint" aria-hidden="true"></span><span class="portal-copy"><strong>悦见时刻</strong><small>把照片留成回忆</small></span></button>
+        <span class="portal-core" aria-hidden="true">选一个入口<br>慢慢开始</span>
+      </div>
+    </div>
+    <div class="home-topic-heading"><p class="section-index">从一个熟悉的问题开始</p><h2>你可以这样问</h2></div>
+    <div class="home-topics">
+      <button class="topic-card" type="button" data-prompt="T区在哪里？可以用图标出来吗？"><img src="/chat/assets/essence-into.png" alt=""><span><strong>脸上哪里是 T 区？</strong><small>看图认识护肤部位</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-prompt="法令纹在脸上哪里？护肤品怎么轻柔涂抹？"><img src="/chat/assets/essence-for.png" alt=""><span><strong>法令纹怎么护理？</strong><small>用白话说明涂抹位置</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+      <button class="topic-card" type="button" data-prompt="我想了解这款产品怎么使用。"><img src="/chat/assets/essence-debate.png" alt=""><span><strong>这款产品怎么用？</strong><small>先核对资料，再给建议</small></span><span class="topic-arrow" aria-hidden="true">↗</span></button>
+    </div>
+    <p class="home-note">你也可以进入咨询后，直接用自己的话提问。</p>
+    </section>
+    <section class="customer-schedule-view" id="schedule-view" aria-labelledby="schedule-title" data-flight-obstacle hidden>
+      <div class="schedule-heading"><span class="butterfly-anchor" data-butterfly-anchor="schedule" aria-hidden="true"></span><div><p class="section-index">我的日常护理</p><h1 id="schedule-title" tabindex="-1">护肤日程</h1></div></div>
+      <p id="schedule-storage-feedback" class="schedule-storage-feedback" role="status" aria-live="polite" hidden></p>
+      <p id="schedule-sync-feedback" class="schedule-storage-feedback" role="status" aria-live="polite">正在连接共享日程…</p>
+      <section class="schedule-panel" id="schedule-panel" aria-label="护肤日程">
+        <section class="schedule-streak" aria-label="护理习惯"><div class="streak-count"><strong id="schedule-streak">0</strong><span>天连续护理</span></div><span class="streak-divider" aria-hidden="true"></span><div><strong id="schedule-week-count">本周 0 次</strong><small>每完成一天，就为自己记上一笔</small></div></section><section class="schedule-tonight" aria-label="今晚的护肤"><div><p class="schedule-eyebrow">今天的护理</p><h2 id="schedule-tonight-copy">先看看今天安排了什么</h2></div><button id="schedule-start-evening" type="button">开始打卡 <span aria-hidden="true">↗</span></button></section>
+        <section class="schedule-day" aria-labelledby="schedule-day-title"><div class="day-heading"><div><p class="section-index">按时段慢慢来</p><h2 id="schedule-day-title"></h2></div><span id="schedule-day-summary" class="day-summary"></span></div><div id="schedule-events" class="schedule-events"></div></section>
+        <section class="schedule-calendar" aria-labelledby="calendar-title"><div class="calendar-heading"><div><p class="section-index">每一天，都记得</p><h2 id="calendar-title" aria-live="polite"></h2></div><div class="calendar-controls"><button id="calendar-today" type="button">今天</button><button id="calendar-prev" type="button" aria-label="上个月">‹</button><button id="calendar-next" type="button" aria-label="下个月">›</button></div></div><div class="calendar-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-grid" id="calendar-grid" role="group" aria-label="护肤日历日期"></div><p class="calendar-legend"><span aria-hidden="true"></span>当天有完成的护理记录</p></section>
+      </section>
+      <section class="schedule-panel" id="products-panel" aria-label="我的护肤品" hidden><div class="inventory-heading"><div><p class="section-index">开封与建议使用周期</p><h2>我的护肤品 <span id="schedule-product-count">0 件</span></h2></div><button id="schedule-add-product" class="primary" type="button">＋ 添加护肤品</button></div><div class="inventory-legend" aria-label="产品类别颜色"><span data-cat="cleansing">洁面</span><span data-cat="skincare">护肤</span><span data-cat="makeup">美妆</span><span data-cat="hair">美发</span></div><ul id="schedule-products" class="schedule-products"></ul></section>
+      <section class="schedule-panel" id="product-entry-panel" aria-label="添加护肤品" hidden><div class="inventory-heading"><div><p class="section-index">我的护肤品</p><h2>添加护肤品</h2></div><button id="schedule-cancel-product" type="button">返回列表</button></div>
+        <form id="schedule-product-form" class="schedule-product-form">
+          <fieldset class="product-photo-pair"><legend>拍摄或选择产品包装两面</legend><div class="product-photo-slot"><strong>正面</strong><button id="schedule-photo-front" type="button">拍摄正面</button><button id="schedule-upload-front" type="button">从相册选择</button><input id="schedule-photo-front-input" type="file" accept="image/*" capture="environment" hidden><input id="schedule-upload-front-input" type="file" accept="image/*" hidden><div id="schedule-photo-front-preview" class="product-photo-preview" role="img" aria-label="正面包装照片预览" hidden></div><span id="schedule-photo-front-state">尚未添加</span></div><div class="product-photo-slot"><strong>背面标签</strong><button id="schedule-photo-back" type="button">拍摄背面</button><button id="schedule-upload-back" type="button">从相册选择</button><input id="schedule-photo-back-input" type="file" accept="image/*" capture="environment" hidden><input id="schedule-upload-back-input" type="file" accept="image/*" hidden><div id="schedule-photo-back-preview" class="product-photo-preview" role="img" aria-label="背面标签照片预览" hidden></div><span id="schedule-photo-back-state">尚未添加</span></div><label class="product-vision-consent"><input id="schedule-vision-consent" type="checkbox">同意将这两张产品照片发送到已配置的豆包或 DeepSeek 识图模型；不勾选时仅在本机做文字读取。</label><button id="schedule-recognize-product" type="button" disabled>识别两面包装</button><span>尽量让瓶身文字铺满画面，拍清名称、规格和背面开盖标志。图片不会存进日程。</span></fieldset><div id="schedule-ocr-result" class="product-ocr-result" role="status" aria-live="polite" hidden></div>
+          <label>产品类别<select id="schedule-product-category" required><option value="">请选择类别</option><optgroup label="洁面"><option>洁面</option></optgroup><optgroup label="护肤"><option>化妆水</option><option>精华</option><option>乳液</option><option>面霜</option><option>防晒</option><option>眼霜</option><option>面膜</option></optgroup><optgroup label="美妆"><option>口红</option><option>彩妆</option></optgroup><optgroup label="美发"><option>洗发护发</option><option>造型护理</option></optgroup><option>其他</option></select></label>
+          <label>产品名称<input id="schedule-product-name" maxlength="80" placeholder="例如：理肤泉 B5 修复霜" required></label><label>开封后建议使用期限（月，可留空）<input id="schedule-product-shelf-life" type="number" min="1" max="60" inputmode="numeric" placeholder="按瓶身开盖标志填写，如 12M；没有标注可留空"></label><label>开封日期<input id="schedule-product-opened" type="date" required></label><label>使用次数／时段<select id="schedule-product-period"><option value="morning">每天 1 次 · 早上</option><option value="evening">每天 1 次 · 晚上</option><option value="both">每天 2 次 · 早晚</option></select></label><label>使用区域<input id="schedule-product-area" maxlength="40" placeholder="例如：面部、颈部" required></label>
+          <fieldset class="product-weekdays"><legend>每周使用日</legend><label><input type="checkbox" value="1" checked>一</label><label><input type="checkbox" value="2" checked>二</label><label><input type="checkbox" value="3" checked>三</label><label><input type="checkbox" value="4" checked>四</label><label><input type="checkbox" value="5" checked>五</label><label><input type="checkbox" value="6" checked>六</label><label><input type="checkbox" value="0" checked>日</label></fieldset><div class="product-form-actions"><button type="submit" class="primary">保存并加入日程</button><button id="schedule-entry-cancel" type="button">取消</button><span id="schedule-feedback" role="status" aria-live="polite"></span></div>
+        </form><p class="schedule-local-note">照片仅用于这次识别，不存入日程。外部识图需单独勾选同意；开封后期限请核对瓶身标志。</p>
+      </section>
+      <nav class="schedule-bottom-nav" id="schedule-bottom-nav" aria-label="护肤功能"><button type="button" data-schedule-tab="schedule" aria-current="page">护肤日程</button><button type="button" data-schedule-tab="products">我的护肤品</button></nav>
+      <section class="schedule-observation" aria-labelledby="observation-title" hidden><div class="observation-heading"><div><p class="section-index">不急着下结论</p><h2 id="observation-title">这个月 · 皮肤观察</h2></div><span id="observation-month-count" class="day-summary"></span></div><p class="observation-guidance">记下自己的感受就好，不需要判断原因；皮肤变化不能只凭日程记录来诊断。</p><form id="schedule-observation-form" class="observation-form"><label for="observation-status">最近的感觉</label><select id="observation-status"><option value="steady">变化不大</option><option value="improved">有些改善</option><option value="fluctuating">状态有起伏</option></select><label for="observation-note">留一句给下次的自己</label><textarea id="observation-note" rows="2" maxlength="500" placeholder="例如：眼角这周觉得滋润些了"></textarea><button type="submit">记下今天的观察</button><span id="observation-feedback" role="status" aria-live="polite"></span></form><div id="observation-history" class="observation-history"></div></section>
+    </section>
+    <section class="customer-consult-view" id="consult-view" aria-label="在线咨询" data-flight-obstacle hidden>
+      <span class="butterfly-anchor" data-butterfly-anchor="consult" aria-hidden="true"></span>
+    <div id="customer-notice" class="notice customer-notice" role="status" aria-live="polite"></div>
+    <div class="customer-consult-layout">
+    <aside class="session-sidebar" aria-label="咨询记录">
+      <div class="history-heading"><div><p class="section-index">我的记录</p><h2>聊过的话题</h2></div><span class="history-count" id="history-count">0</span></div>
+      <button id="new-session" type="button" class="new-session-button"><span aria-hidden="true">＋</span> 开始新咨询</button>
+      <nav id="session-groups" class="session-groups" aria-label="按话题分类的咨询记录"></nav>
+      <p class="history-note">只在此浏览器中显示你的咨询记录</p>
+    </aside>
+    <div class="consult-main">
+    <div class="customer-workspace">
+      <div class="workspace-heading"><div><p class="section-index">01 / 贴心咨询</p><h2>今天想了解什么？</h2></div><p>直接说你的问题，不需要记住专业名称。</p></div>
+      <div class="toolbar customer-toolbar"><label>本次咨询商品<select id="product-select" aria-label="本次咨询商品"></select></label><span id="session-state" class="badge"></span></div>
+      <article class="panel customer-conversation"><div class="conversation-title"><span class="conversation-icon" aria-hidden="true">✦</span><div><strong>专属美妆顾问</strong><small>认真听你说，慢慢讲清楚</small></div></div>
+        <div id="messages" class="customer-messages" aria-live="polite"></div>
+        <form id="send-form" class="customer-composer"><label for="message">想问些什么？</label><textarea id="message" rows="3" maxlength="10000" placeholder="例如：法令纹在脸上哪里？可以画图给我看看吗？" required></textarea><div class="actions"><button id="send" class="primary">发送问题 <span aria-hidden="true">↗</span></button><button id="cancel" type="button" disabled>停止等待</button><button id="human" type="button">联系人工</button><button id="check" type="button" hidden>查看上次处理结果</button></div></form>
+        <div class="care-image-input"><button id="record-consult" type="button" disabled>录音转写到提问框</button><button id="stop-recording" type="button" hidden>停止录音并转写</button><p id="speech-status" role="status" aria-live="polite">语音服务未配置，可继续打字。</p><p class="small muted">点击录音即同意本次将音频发给火山方舟；转写只填入草稿，核对后再发送。不会自动执行护理指令。</p></div>
+      </article>
+    </div>
+    <section class="panel care-panel" aria-labelledby="care-title">
+      <h2 id="care-title">一步一步做护理</h2>
+      <p class="muted">先确认手中产品；文字可查候选。图片识别服务配置后可试用，结果只是候选，须本人核对。</p>
+      <div class="care-image-input">
+        <label for="care-photo">自愿选择瓶身或背标照片（不要包含人脸）</label>
+        <input id="care-photo" type="file" accept="image/jpeg,image/png,image/webp">
+        <img id="care-photo-preview" alt="已选择的瓶身照片预览" hidden>
+        <label><input id="care-photo-authorize" type="checkbox"> 我同意本次将这张包装照片发给 <span id="care-image-provider">图片服务</span> 进行文字读取；后端不保存此照片</label>
+        <div class="care-actions"><button id="recognize-care-photo" type="button" disabled>读取照片文字，找商品候选</button><button id="cancel-care-photo" type="button" hidden>停止等待</button></div>
+        <p id="care-photo-status" class="small muted" role="status" aria-live="polite">检查图片识别服务中…</p>
+        <div id="care-photo-candidates" aria-live="polite"></div>
+      </div>
+      <label for="package-text">瓶身上看见的名称（仅文字匹配，不是识图）</label>
+      <div class="care-actions"><input id="package-text" maxlength="500" placeholder="输入瓶身名称"><button id="find-care-products" type="button">找候选</button></div>
+      <p id="care-candidates" class="small muted" role="status"></p>
+      <label for="care-products">请本人核对产品；可选择最多三件，按列表顺序执行</label>
+      <select id="care-products" multiple size="3" aria-label="本次护理的已确认产品"></select>
+      <p class="small muted">目前仅开放虚构演示商品的流程操作；正式商品需要 B/D 先审核早晚顺序及适用范围，不能自动搭配。时段仅用于标记，不代表适用频次已验证。</p>
+      <div class="care-actions"><label for="care-period">护理时间</label><select id="care-period"><option value="evening">晚间</option><option value="morning">早间</option></select><button id="start-care" type="button" class="primary">确认这些产品，开始护理</button></div>
+      <div id="care-state" role="status" aria-live="polite"></div>
+      <div class="care-actions"><button id="speak-care" type="button" disabled>朗读当前步骤</button><button id="stop-speech" type="button" hidden>停止播放</button></div>
+      <div class="care-actions" id="care-controls" hidden>
+        <button type="button" data-care-action="repeat">重说</button>
+        <button type="button" data-care-action="confirm" class="primary">好了，完成这一步</button>
+        <button type="button" data-care-action="skip">跳过（不记录完成）</button>
+        <button type="button" data-care-action="stop">停止</button>
+      </div>
+      <div class="care-actions" id="care-text-controls" hidden><label for="care-command">也可输入文字指令</label><input id="care-command" maxlength="100" placeholder="好了 / 重说 / 跳过 / 停止"><button id="send-care-command" type="button">发送指令</button></div>
+      <button id="record-care" type="button" disabled>录音转写到指令框（须核对）</button>
+      <h3>我的护理记录</h3><div id="care-events" aria-live="polite"></div>
+    </section>
+    <details class="panel customer-profile" id="profile"><summary><span class="profile-icon" aria-hidden="true">♡</span><span><strong>我的偏好与资料</strong><small>按你的习惯，提供更贴心的回答</small></span></summary><p class="small muted">只保存你确认的信息，用于下次提供更贴合的服务。可随时在这里修改或清空。</p>
+      <form id="card-form"><label for="preferences">偏好（每行一项）</label><textarea id="preferences" rows="2" placeholder="例如：喜欢清爽的质地"></textarea><label for="concerns">关注点（每行一项）</label><textarea id="concerns" rows="2"></textarea><div id="facts"></div><div class="actions"><button id="save-profile" class="primary">保存我的资料</button><span id="profile-feedback" class="form-feedback" role="status" aria-live="polite"></span></div></form>
     </details>
-    <p class="small muted">本演示通过当前浏览器保存匿名身份；清除浏览器Cookie后无法自动找回原身份。</p>
-  </main><footer class="customer-shell">依据可用资料回答 · 不确定时会向你确认 · 支持人工服务</footer>
-</body></html>
+    <p class="customer-privacy"><span aria-hidden="true">◌</span> 本演示通过当前浏览器保存匿名身份；清除浏览器 Cookie 后无法自动找回原身份。</p>
+    </div>
+    </div>
+    </section>
+  </main>
+  <dialog id="video-moment-dialog" class="video-moment-dialog" aria-labelledby="video-moment-title">
+    <form method="dialog" class="video-moment-head"><div><p class="section-index">悦见时刻 / 测试入口</p><h2 id="video-moment-title">把护肤照片整理成一段约 15 秒的回忆</h2></div><button type="submit" class="dialog-close" aria-label="关闭悦见时刻">×</button></form>
+    <p class="video-moment-intro">点击“＋ 添加照片”，选择你明确授权的照片。建议 15 张，系统只接收素材；当前未接入视频服务，不会生成或假装生成视频。</p>
+    <div class="video-moment-actions"><button id="video-add-photos" type="button" class="primary"><span aria-hidden="true">＋</span> 添加照片</button><input id="video-photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><span id="video-photo-count" class="video-count">已选 0 / 建议 15 张</span></div>
+    <div id="video-photo-list" class="video-photo-list" aria-live="polite"><p class="muted">还没有选择照片。可一次选多张，也可分次补充。</p></div>
+    <label class="video-authorize"><input id="video-authorize" type="checkbox"> 我确认这些照片由我授权用于本机“悦见时刻”测试；不上传到外部视频服务。</label>
+    <div class="video-moment-actions"><button id="video-submit" type="button" class="primary" disabled>测试此 Skill</button><span id="video-moment-feedback" class="form-feedback" role="status" aria-live="polite"></span></div>
+    <h3>我已授权保存的照片批次</h3><p class="small muted">目前只保存在本机，没有生成视频；可删除整批照片及清单。删除后不能恢复。</p><div id="saved-video-moments" aria-live="polite"></div>
+  </dialog>
+  <footer class="customer-shell customer-footer"><span>暖颜 · 陪你从容护肤</span><span>依据可用资料回答 · 不确定时会向你确认 · 支持人工服务</span></footer>
+</body>
+</html>

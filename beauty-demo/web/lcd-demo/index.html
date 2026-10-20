@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>悦见 · LCD 画面模拟</title>
+  <style>
+    :root { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #352d35; background: #f6f2f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+    main { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 36px; padding: 28px 16px; }
+    .frame { background: #302a30; padding: 12px; border-radius: 25px; box-shadow: 0 16px 38px #352d3540; }
+    /* Everything inside this rectangle represents a real 240 × 284 pixel screen. */
+    .lcd { width: 240px; height: 284px; overflow: hidden; border-radius: 11px; background: #fff9f4; display: flex; flex-direction: column; }
+    .top { height: 39px; flex: none; padding: 7px 11px 4px; color: white; background: #674353; display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-size: 16px; font-weight: 800; letter-spacing: 2px; }
+    .top small { display: block; font-size: 9px; color: #f7d9db; text-align: right; }
+    .content { flex: 1; min-height: 0; padding: 7px 10px 4px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .stats { width: 100%; display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: bold; color: #674353; }
+    .stats strong { font-size: 12px; }
+    .face { width: 88px; height: 94px; margin: 1px auto 0; flex: none; }
+    .face .hair { fill: #503a40; } .face .skin { fill: #fff0df; stroke: #73545a; stroke-width: 1.5; }
+    .face .detail { fill: none; stroke: #73545a; stroke-width: 1.6; stroke-linecap: round; }
+    .face .highlight { fill: #f2ae74; opacity: .82; }
+    .face .boundary { fill: none; stroke: #6691a7; stroke-width: 2; stroke-dasharray: 3 2; }
+    .face .highlight[hidden], .face .boundary[hidden] { display: none; }
+    .step { font-size: 10px; color: #805d69; line-height: 14px; }
+    .product { margin: 1px 0; font-size: 14px; line-height: 19px; font-weight: 800; max-width: 218px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .area { font-size: 10px; line-height: 14px; color: #745766; }
+    .instruction { font-size: 11px; line-height: 16px; font-weight: 600; margin: 1px 0 0; max-width: 215px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .actions { display: flex; width: 100%; gap: 8px; padding: 2px 10px 0; margin-top: auto; }
+    .actions button { flex: 1; height: 28px; border: none; border-radius: 7px; color: #fff; background: #a05a74; font-weight: bold; font-size: 11px; cursor: pointer; }
+    .actions button + button { color: #674353; background: #e8d8df; }
+    .footer { flex: none; text-align: center; padding: 2px 3px 5px; color: #8a6975; font-size: 9px; }
+    .simple { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 13px; text-align: center; }
+    .simple .icon { font-size: 42px; color: #a05a74; }
+    .simple h2 { font-size: 18px; margin: 0; } .simple p { margin: 0; font-size: 11px; line-height: 1.7; }
+    .simple button { background: #a05a74; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    aside { width: min(360px, 100%); padding: 24px; background: white; border-radius: 18px; box-shadow: 0 8px 28px #352d3512; }
+    h1 { font-size: 21px; margin: 0 0 8px; } .hint { font-size: 13px; line-height: 1.6; color: #685c64; }
+    label { display: block; margin: 13px 0; font-size: 13px; font-weight: 600; }
+    select { display: block; width: 100%; margin-top: 5px; padding: 8px; border: 1px solid #cbbbc4; border-radius: 8px; background: white; font: inherit; }
+    .tag { display: inline-block; padding: 3px 8px; color: #804755; background: #fbe8e9; border-radius: 10px; font-size: 12px; }
+    .note { font-size: 12px; color: #685c64; line-height: 1.6; }
+    .menu { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .menu button { min-height: 57px; border: 1px solid #e5cad3; background: #fff; border-radius: 9px; color: #694756; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .menu button span { display: block; font-size: 20px; line-height: 25px; }
+    .simple .detail { font-size: 10px; color: #765e6b; line-height: 1.5; }
+    .simple .notice { background: #fcefd8; border-radius: 8px; padding: 7px; color: #5f4435; }
+    .simple .primary { font-weight: 700; background: #a05a74; }
+    .simple .secondary { background: #e8d8df; color: #674353; }
+    .simple .choices { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+    .simple .choices button { flex: 1 1 68px; min-height: 26px; padding: 3px; font-size: 10px; }
+    .simple .quote { width: 100%; max-height: 43px; overflow: auto; background: white; border: 1px solid #ecdce0; border-radius: 8px; padding: 5px; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+    .simple .icon { line-height: 1; font-size: 28px; } .simple { gap: 5px; padding: 7px; }
+    .journey { font-size: 12px; line-height: 1.65; color: #66545d; padding-left: 19px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="frame"><div class="lcd" id="lcd" aria-label="240乘284像素LCD模拟画面"></div></div>
+    <aside>
+      <h1>悦见 · LCD 模拟器</h1>
+      <span class="tag">展示样稿 · 不连接设备</span>
+      <p class="hint">在左侧点选入口，体验设备 Demo 流程；识图和转写结果不设二次确认。这里没有真实拍摄、录音、模型调用或护理操作。</p>
+      <label>快速跳到画面<select id="scene">
+        <option value="home">主页</option>
+        <option value="image_intent">包装识图 · 拍摄确认</option>
+        <option value="voice_intent">说句话 · 录音确认</option>
+        <option value="routine">护肤日程</option>
+        <option value="moment_intent">悦见时刻</option>
+      </select></label>
+      <label>步骤<select id="step"><option value="0">第 1 步 · 演示洁面</option><option value="1">第 2 步 · 演示面霜</option></select></label>
+      <label>脸图高亮（仅预览）<select id="region">
+        <option value="none">不高亮（当前桥接默认）</option>
+        <option value="full_face">全脸</option><option value="under_eye">眼下位置</option>
+        <option value="forehead">额头</option><option value="cheek">双颊</option><option value="chin">下巴</option>
+      </select></label>
+      <ol class="journey"><li>包装：点选 → 单次拍摄同意 → 外发同意 → 显示候选／演示咨询。</li><li>语音：点选 → 单次录音同意 → 外发同意 → 显示转写／演示咨询。</li><li>护理：演示步骤 → 模拟完成／重听 → 结束。</li></ol>
+      <p class="note">所有次数、商品和回复均为假数据；按钮只切换本页状态。高亮图是预览，当前 USB 桥接的 <code>region</code> 仍是 <code>null</code>。转写出的“好了”不会当成护理完成按钮。</p>
+    </aside>
+  </main>
+  <script>
+    const lcd = document.querySelector('#lcd');
+    const scene = document.querySelector('#scene');
+    const step = document.querySelector('#step');
+    const region = document.querySelector('#region');
+    let view = 'home';
+    let draft = '这瓶面霜怎么使用？';
+    const steps = [
+      { product: '虚构演示洁面', instruction: '轻柔清洁，再用清水洗净。' },
+      { product: '虚构演示面霜', instruction: '按演示说明轻柔涂匀。' },
+    ];
+    const shapes = {
+      full_face: '<ellipse class="highlight" cx="50" cy="50" rx="28" ry="34"/>',
+      under_eye: '<ellipse class="highlight" cx="37" cy="50" rx="10" ry="4"/><ellipse class="highlight" cx="63" cy="50" rx="10" ry="4"/><path class="boundary" d="M27 57 Q37 61 47 57 M53 57 Q63 61 73 57"/>',
+      forehead: '<ellipse class="highlight" cx="50" cy="30" rx="23" ry="9"/>',
+      cheek: '<ellipse class="highlight" cx="33" cy="59" rx="9" ry="10"/><ellipse class="highlight" cx="67" cy="59" rx="9" ry="10"/>',
+      chin: '<ellipse class="highlight" cx="50" cy="79" rx="12" ry="6"/>',
+    };
+    const face = () => `<svg class="face" viewBox="0 0 100 102" role="img" aria-label="固定脸图和${region.selectedOptions[0].textContent}高亮示意">
+      <path class="hair" d="M19 84 Q1 34 28 12 Q49 -2 70 12 Q99 34 81 84 L74 96 L26 96Z"/>
+      <ellipse class="skin" cx="50" cy="51" rx="30" ry="41"/>${shapes[region.value] || ''}
+      <path class="hair" d="M21 35 Q19 9 48 11 Q62 7 80 31 Q66 30 57 23 Q40 35 21 35Z"/>
+      <path class="detail" d="M28 42 Q37 38 45 42 M55 42 Q64 38 72 42 M48 48 L46 62 Q50 65 54 62 M41 75 Q50 80 59 75"/>
+    </svg>`;
+    const header = `<header class="top"><div class="brand">悦见</div><div><small>USB 本地演示</small><small>DEMO</small></div></header>`;
+    const pages = {
+      image_intent: { icon: '▣', title: '识别包装', text: '请只对准商品包装。点击后模拟本次拍照，不使用真实摄像头。', buttons: [['本次拍照', 'image_photo'], ['取消', 'home']] },
+      image_photo: { icon: '▧', title: '照片预览', text: '已模拟采集 1 张包装照片。此时仍未发送给外部模型。', buttons: [['继续核对授权', 'image_consent'], ['重拍', 'image_intent'], ['丢弃', 'home']] },
+      image_consent: { icon: '◇', title: '提交图片识别？', text: '单独确认本次图片提交外部识图服务；取消则丢弃照片。', buttons: [['同意本次提交', 'image_transfer'], ['不同意', 'home']] },
+      image_transfer: { icon: '⇢', title: '经 USB 提交', text: '模拟电脑收到图片并校验后交给识图服务。没有实际 USB 或网络请求。', buttons: [['查看候选', 'image_result'], ['取消', 'home']] },
+      image_result: { icon: '◎', title: '识别结果', text: '演示候选：虚构演示面霜。无需再点确认即可查看咨询示例；不会自动启动护理。', buttons: [['查看咨询示例', 'consult'], ['重新拍摄', 'image_intent'], ['返回主页', 'home']] },
+      voice_intent: { icon: '◉', title: '说句话', text: '点击后模拟本次 3 秒录音。不会开启电脑或设备麦克风。', buttons: [['本次录音', 'voice_recorded'], ['取消', 'home']] },
+      voice_recorded: { icon: '▥', title: '录音已准备', text: '模拟 3 秒 WAV 已经 USB 校验；目前还没有提交给转写模型。', buttons: [['继续核对授权', 'voice_consent'], ['重录', 'voice_intent'], ['丢弃', 'home']] },
+      voice_consent: { icon: '◇', title: '提交录音转写？', text: '单独确认本次录音发往语音服务；取消则丢弃录音。', buttons: [['同意本次提交', 'voice_transfer'], ['不同意', 'home']] },
+      voice_transfer: { icon: '⇢', title: '正在转写', text: '模拟电脑把本次录音交给模型。不会真实外发或执行护理口令。', buttons: [['查看识别结果', 'voice_sent'], ['取消', 'home']] },
+      voice_sent: { icon: '✓', title: '转写结果', text: '演示文字直接用于咨询示例，无二次核对；没有向真实客服发送消息。', quote: 'draft', buttons: [['查看咨询示例', 'consult'], ['重录', 'voice_intent'], ['返回主页', 'home']] },
+      consult: { icon: '☺', title: '客服咨询', text: '示例回复：请先核对商品包装及说明，具体用法以已确认资料为准。', buttons: [['模拟朗读回复', 'spoken'], ['说句话', 'voice_intent'], ['返回主页', 'home']] },
+      spoken: { icon: '♫', title: '朗读状态示意', text: '文字转语音已在电脑端测试；设备扬声器播放尚未接通。此处不会发声。', buttons: [['返回咨询', 'consult'], ['返回主页', 'home']] },
+      moment_intent: { icon: '▣', title: '悦见时刻', text: '照片回顾是另一种用途，不等同包装识图。这里仅模拟本人主动拍摄。', buttons: [['本次拍照', 'moment_review'], ['取消', 'home']] },
+      moment_review: { icon: '▧', title: '照片待核对', text: '已模拟拍摄；未上传、未存储，也不用于推断护肤效果。', buttons: [['返回主页', 'home'], ['重新拍摄', 'moment_intent']] },
+      finished: { icon: '✓', title: '今晚护理完成', text: '演示画面：连续护理 4 天。没有真实完成事件或打卡记录。', buttons: [['返回主页', 'home'], ['再看步骤', 'routine']] },
+    };
+    function change(next) {
+      view = next;
+      if (['home', 'routine', 'image_intent', 'voice_intent', 'moment_intent'].includes(next)) scene.value = next;
+      render();
+    }
+    function render() {
+      if (view === 'home') {
+        lcd.innerHTML = `${header}<div class="simple"><div class="icon" aria-hidden="true">◇</div><h2>你好，欢迎回来</h2><div class="menu">
+          <button data-next="image_intent"><span>▣</span>识别包装</button><button data-next="voice_intent"><span>◉</span>说句话</button>
+          <button data-next="routine"><span>♡</span>护肤日程</button><button data-next="moment_intent"><span>▧</span>悦见时刻</button></div>
+          <p class="detail">请主动选择；不会自动采集</p></div><div class="footer">展示样稿 · 无真实设备连接</div>`;
+      } else if (view !== 'routine') {
+        const page = pages[view];
+        lcd.innerHTML = `${header}<div class="simple"><div class="icon" aria-hidden="true"></div><h2></h2><p class="message"></p>
+          ${page.quote ? '<div class="quote"></div>' : ''}<div class="choices"></div></div><div class="footer">演示流程 · 不调用硬件或模型</div>`;
+        lcd.querySelector('.icon').textContent = page.icon;
+        lcd.querySelector('h2').textContent = page.title;
+        lcd.querySelector('.message').textContent = page.text;
+        if (page.quote) lcd.querySelector('.quote').textContent = draft;
+        for (const [label, next] of page.buttons) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.textContent = label; button.dataset.next = next;
+          lcd.querySelector('.choices').append(button);
+        }
+      } else {
+      const i = Number(step.value), item = steps[i];
+      lcd.innerHTML = `${header}<section class="content"><div class="stats"><span>连续护理 <strong>4</strong> 天</span><span>23:00 休息</span></div>
+        ${face()}<div class="step">第 ${i + 1} 步 / ${steps.length} 步</div>
+        <div class="product"></div><div class="area">${region.value === 'none' ? '涂抹范围待确认' : region.selectedOptions[0].textContent + ' · 示意位置'}</div>
+        <p class="instruction"></p></section><div class="actions"><button type="button" id="done">好了（模拟）</button><button type="button" id="repeat">重听（模拟）</button></div>
+        <div class="footer" id="feedback">演示数据 · 不写入完成记录</div>`;
+      lcd.querySelector('.product').textContent = item.product;
+      lcd.querySelector('.instruction').textContent = item.instruction;
+      lcd.querySelector('#done').addEventListener('click', () => {
+        if (i === steps.length - 1) change('finished'); else { step.value = String(i + 1); render(); }
+      });
+      lcd.querySelector('#repeat').addEventListener('click', () => {
+        lcd.querySelector('#feedback').textContent = '模拟重听：设备语音播放尚未接入';
+      });
+      }
+    }
+    lcd.addEventListener('click', event => {
+      const button = event.target.closest('button[data-next]');
+      if (button && lcd.contains(button)) change(button.dataset.next);
+    });
+    scene.addEventListener('change', () => change(scene.value));
+    step.addEventListener('change', render);
+    region.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>

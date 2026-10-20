@@ -39,6 +39,7 @@ export class AccessControl {
     }
     store.db.prepare('DELETE FROM access_sessions WHERE expires_at < ?').run(Date.now());
     store.db.prepare('DELETE FROM api_credentials WHERE expires_at < ?').run(Date.now());
+    store.db.prepare('DELETE FROM device_credentials WHERE expires_at < ?').run(Date.now());
   }
   private cookieValue(req: Request, name: string) {
     return req.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith(name + '='))?.slice(name.length + 1);
@@ -117,6 +118,24 @@ export class AccessControl {
     const token = randomBytes(32).toString('base64url'); const id = randomUUID(); const expiresAt = Date.now() + 30 * 86400_000;
     this.store.db.prepare('INSERT INTO api_credentials VALUES(?,?,?,?)').run(id, hash(token), userId, expiresAt);
     return { token, id, userId, expiresAt };
+  }
+  issueDevice(userId: string) {
+    this.store.getCard(userId);
+    const token = randomBytes(32).toString('base64url'); const expiresAt = Date.now() + 7 * 86400_000;
+    this.store.db.prepare('INSERT INTO device_credentials VALUES(?,?,?)').run(hash(token), userId, expiresAt);
+    return { token, userId, expiresAt };
+  }
+  requireDevice(req: Request): string {
+    const match = /^Bearer ([A-Za-z0-9_-]{32,100})$/.exec(req.headers.authorization ?? '');
+    if (!match) throw new AppError(401, 'DEVICE_TOKEN_REQUIRED', '设备连接需要绑定用户的访问凭据。');
+    const row = this.store.db.prepare('SELECT user_id AS userId FROM device_credentials WHERE hash=? AND expires_at>?')
+      .get(hash(match[1]!), Date.now()) as { userId: string } | undefined;
+    if (!row) throw new AppError(401, 'INVALID_DEVICE_TOKEN', '设备凭据无效或已过期。');
+    return row.userId;
+  }
+  revokeDevices(userId: string) {
+    this.store.getCard(userId);
+    return { userId, revoked: Number(this.store.db.prepare('DELETE FROM device_credentials WHERE user_id=?').run(userId).changes) };
   }
   /** Legacy routes are operator-only except a fixed, user-bound MCP allowlist. */
   guard: RequestHandler = (req, _res, next) => {

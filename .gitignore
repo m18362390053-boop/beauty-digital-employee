@@ -1,6 +1,7 @@
 # Local API credentials; never part of the team handoff.
 typesafe_apikey.txt
 deepseek_api.txt
+doubao_api.txt
 **/*apikey*.txt
 **/*api_key*.txt
 **/.env
@@ -8,6 +9,8 @@ deepseek_api.txt
 !**/.env.example
 **/node_modules/
 **/dist/
+**/__pycache__/
+**/*.pyc
 beauty-demo/data/
 beauty-demo/test-results/
 beauty-demo/config/local.json
@@ -15,6 +18,7 @@ beauty-demo/config/local.json
 **/model-settings.json.tmp
 **/operator-password.txt
 **/mcp-credentials-*.json
+**/device-token*.txt
 
 # Local planning/conversation notes are not release artifacts.
 shabi.md

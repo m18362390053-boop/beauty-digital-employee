@@ -71,7 +71,9 @@ test('product import is versioned; only approved facts with sources reach knowle
   assert.equal((await request('/api/imports/products', 'POST', modified)).status, 200);
   await request('/api/imports/products', 'POST', product);
   assert.equal((await request('/api/products/demo-product/knowledge')).body.version, 'demo-v2');
-  assert.equal((await request('/api/imports/products', 'POST', { ...product, productId: 'second-product' })).body.error.code, 'SINGLE_PRODUCT_SCOPE');
+  assert.equal((await request('/api/imports/products', 'POST', { ...product, productId: 'second-product' })).status, 200);
+  assert.equal((await request('/api/products')).body.items.length, 2);
+  assert.equal((await request('/api/imports/products', 'POST', { ...product, productId: 'business-product', dataKind: 'business' })).body.error.code, 'DATA_KIND_CONFLICT');
 });
 
 test('unapproved-only knowledge explicitly reports insufficient evidence', async t => {

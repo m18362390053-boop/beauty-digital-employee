@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { idSchema, type Card, type ProductDocument, type RouteDecision, skillDefinitionSchema } from '../contracts/index.js';
+import { faceRegions } from './face-guides.js';
 
 const probability = z.number().min(0).max(1);
 export const skillVersionSchema = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/);
@@ -8,6 +9,7 @@ export const businessSkillSchema = skillDefinitionSchema.extend({
   description: z.string().trim().min(1).max(2_000),
   intents: z.array(idSchema).min(1), instructions: z.string().min(1).max(40_000),
   requiresKnowledge: z.boolean().default(true),
+  recommendation: z.object({ maxClarifications: z.number().int().min(0).max(3), category: z.string().trim().min(1).max(100) }).strict().optional(),
   knowledge: z.array(z.object({ title: z.string().min(1).max(200), content: z.string().min(1).max(40_000) }).strict()).max(20).default([]),
 });
 export const businessConfigSchema = z.object({
@@ -45,7 +47,8 @@ export interface DecisionProvider {
 }
 export interface GenerationProvider {
   configured: boolean;
-  generate(input: DecisionInput & { skill: BusinessSkill; knowledge: ProductDocument; comments: unknown[]; responseMode?: 'answer' | 'clarify' | 'conversation' }, signal: AbortSignal):
+  generate(input: DecisionInput & { skill: BusinessSkill; knowledge: ProductDocument; comments: unknown[];
+    productCards?: ConsultResult['productCards']; responseMode?: 'answer' | 'clarify' | 'conversation' }, signal: AbortSignal):
     Promise<{ answer: string; sourceRefs: string[]; model: string; usage: unknown }>;
 }
 export const consultResultSchema = z.object({
@@ -53,6 +56,10 @@ export const consultResultSchema = z.object({
   status: z.enum(['answered', 'clarification_required', 'degraded', 'handoff_pending', 'human_active', 'resolved', 'cancelled', 'interrupted']),
   answer: z.string().nullable(), answerKind: z.enum(['generated', 'template', 'none']),
   messageId: idSchema.nullable(), sourceRefs: z.array(z.string()),
+  productCards: z.array(z.object({ productId: idSchema, name: z.string(), shade: z.string(), texture: z.string(),
+    imageUrl: z.string().optional(), price: z.number().optional(), sourceId: idSchema, dataKind: z.enum(['demo', 'business']) }).strict()).default([]),
+  visualGuide: z.object({ region: z.enum(faceRegions), title: z.string(), location: z.string(),
+    application: z.string(), caution: z.string() }).strict().nullable().default(null),
   route: z.record(z.unknown()).nullable(), warnings: z.array(z.string()),
   policyStatus: z.enum(['demo', 'reviewed']), dataKind: z.enum(['demo', 'business']),
   handoffId: idSchema.nullable(), generation: z.record(z.unknown()).nullable(),

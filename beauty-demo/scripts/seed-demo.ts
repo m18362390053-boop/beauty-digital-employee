@@ -8,10 +8,12 @@ const settings = config();
 const store = new Store(settings.databasePath);
 try {
   const existing = store.listProducts();
-  if (existing.some(product => product.productId !== 'demo-product' || product.dataKind !== 'demo')) {
+  if (existing.some(product => product.dataKind !== 'demo')) {
     throw new Error('Refusing to put demo fixtures into a business database. Set DATABASE_PATH to a new demo database.');
   }
   console.log(store.importProduct(await load('product.demo.json')));
+  for (const product of await load('catalog.demo.json')) console.log(store.importProduct(product));
+  for (const product of await load('routine.demo.json')) console.log(store.importProduct(product));
   console.log(store.importComments(await load('comments.demo.json')));
   const users = store.listUsers();
   for (const userId of ['demo-user-a', 'demo-user-b']) {

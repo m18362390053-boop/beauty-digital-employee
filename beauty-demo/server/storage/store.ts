@@ -18,12 +18,19 @@ export class Store {
   /** Shared by local repositories; never exposed through HTTP. */
   readonly db: DatabaseSync;
 
-  constructor(path: string) {
+  constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
     const version = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
-    if (version.user_version > 4) {
+    // Older local skincare builds also used schema version 5 for schedules. Use
+    // the actual schema as well as user_version so those databases can upgrade.
+    const hasTable = (name: string) => Boolean(this.db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+    ).get(name));
+    const hasRoutinePlanColumn = () => hasTable('routine_runs') &&
+      (this.db.prepare('PRAGMA table_info(routine_runs)').all() as Array<{ name: string }>).some(column => column.name === 'plan_json');
+    if (version.user_version > 7) {
       this.db.close();
       throw new Error('Database schema is newer than this application');
     }
@@ -129,10 +136,77 @@ export class Store {
         PRAGMA user_version = 4;
       `);
     });
+    if (version.user_version < 5 || !hasTable('routine_runs')) this.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS routine_runs (
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+          start_request_id TEXT NOT NULL, start_json TEXT NOT NULL,
+          period TEXT NOT NULL CHECK(period IN ('morning','evening')),
+          status TEXT NOT NULL CHECK(status IN ('active','finished','stopped')),
+          current_step INTEGER NOT NULL, steps_json TEXT NOT NULL,
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+          UNIQUE(user_id,start_request_id)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS one_active_routine ON routine_runs(user_id) WHERE status='active';
+        CREATE TABLE IF NOT EXISTS routine_actions (
+          run_id TEXT NOT NULL REFERENCES routine_runs(id), request_id TEXT NOT NULL,
+          input_json TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
+        CREATE TABLE IF NOT EXISTS care_events (
+          id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES routine_runs(id),
+          step_index INTEGER NOT NULL, product_id TEXT NOT NULL REFERENCES products(id),
+          source TEXT NOT NULL CHECK(source IN ('screen','typed_text','device_button')),
+          feeling TEXT, created_at TEXT NOT NULL, voided_at TEXT,
+          UNIQUE(run_id,step_index)
+        );
+        CREATE INDEX IF NOT EXISTS care_events_by_run ON care_events(run_id);
+        CREATE TABLE IF NOT EXISTS device_credentials (
+          hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires_at INTEGER NOT NULL
+        );
+        PRAGMA user_version = 5;
+      `);
+    });
+    if (version.user_version < 6 || !hasTable('care_plans') || !hasTable('modality_events') || !hasRoutinePlanColumn()) this.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS care_plans (
+          id TEXT PRIMARY KEY, version TEXT NOT NULL, document TEXT NOT NULL, digest TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS modality_events (
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+          modality TEXT NOT NULL CHECK(modality IN ('image','asr','tts')),
+          provider TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('succeeded','failed')),
+          code TEXT, created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS modality_events_by_user ON modality_events(user_id,created_at);
+      `);
+      if (!hasRoutinePlanColumn()) this.db.exec('ALTER TABLE routine_runs ADD COLUMN plan_json TEXT');
+      this.db.exec('PRAGMA user_version = 6');
+    });
+    if (version.user_version < 7) this.transaction(() => {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS skincare_schedules (
+        share_id TEXT PRIMARY KEY, document TEXT NOT NULL, updated_at TEXT NOT NULL
+      ); PRAGMA user_version = 7;`);
+    });
   }
 
   close() { this.db.close(); }
-  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 4 }; }
+  health() { return { database: this.db.prepare('SELECT 1 AS ok').get()?.ok === 1, schemaVersion: 7 }; }
+
+  getSkincareSchedule(shareToken: string) {
+    const shareId = hash({ shareToken });
+    const row = this.db.prepare('SELECT document, updated_at AS updatedAt FROM skincare_schedules WHERE share_id = ?').get(shareId) as { document: string; updatedAt: string } | undefined;
+    return row ? { document: JSON.parse(row.document), updatedAt: row.updatedAt } : null;
+  }
+
+  saveSkincareSchedule(shareToken: string, document: unknown) {
+    const shareId = hash({ shareToken });
+    const updatedAt = now();
+    this.db.prepare(`INSERT INTO skincare_schedules (share_id, document, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(share_id) DO UPDATE SET document=excluded.document, updated_at=excluded.updated_at`)
+      .run(shareId, JSON.stringify(document), updatedAt);
+    return { saved: true, updatedAt };
+  }
 
   private transaction<T>(work: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
@@ -150,10 +224,10 @@ export class Store {
     const product = productSchema.parse(input);
     const digest = hash(product);
     return this.transaction(() => {
-      const existingProduct = this.db.prepare('SELECT id FROM products LIMIT 1').get() as { id: string } | undefined;
-      if (existingProduct && existingProduct.id !== product.productId) {
-        throw new AppError(409, 'SINGLE_PRODUCT_SCOPE', 'This demo uses one product. Use a separate database to switch products.');
-      }
+      const existingProduct = this.db.prepare('SELECT id FROM products WHERE id = ?').get(product.productId) as { id: string } | undefined;
+      const existingKind = this.db.prepare(`SELECT json_extract(pv.document, '$.dataKind') AS dataKind FROM products p JOIN product_versions pv
+        ON pv.product_id=p.id AND pv.version=p.current_version LIMIT 1`).get() as { dataKind: string } | undefined;
+      if (existingKind && existingKind.dataKind !== product.dataKind) throw new AppError(409, 'DATA_KIND_CONFLICT', 'Do not mix demo and business data in one database.');
       const previous = this.db.prepare('SELECT digest FROM product_versions WHERE product_id = ? AND version = ?')
         .get(product.productId, product.version) as { digest: string } | undefined;
       if (previous) {
@@ -175,11 +249,31 @@ export class Store {
 
   listProducts() {
     const rows = this.db.prepare(`SELECT pv.document FROM products p JOIN product_versions pv
-      ON pv.product_id = p.id AND pv.version = p.current_version`).all() as DocumentRow[];
+      ON pv.product_id = p.id AND pv.version = p.current_version ORDER BY p.rowid`).all() as DocumentRow[];
     return rows.map(row => {
       const product = JSON.parse(row.document) as ProductDocument;
-      return { productId: product.productId, name: product.name, version: product.version, dataKind: product.dataKind };
+      return { productId: product.productId, name: product.name, version: product.version, dataKind: product.dataKind,
+        recommendation: product.recommendation ?? null };
     });
+  }
+
+  recommendationProducts(dataKind: ProductDocument['dataKind']) {
+    return this.listProducts().filter(product => product.dataKind === dataKind && product.recommendation)
+      .map(product => this.getKnowledge(product.productId))
+      .filter(product => Boolean(product.recommendation?.sourceId && product.facts.some(fact => fact.sourceId === product.recommendation!.sourceId)));
+  }
+
+  priorClarifications(sessionId: string, skillId: string) {
+    const rows = this.db.prepare(`SELECT route_json AS route, result_json AS result FROM consultation_runs
+      WHERE session_id=? AND state='completed' ORDER BY created_at DESC LIMIT 6`).all(sessionId) as { route: string | null; result: string | null }[];
+    let count = 0;
+    for (const row of rows) {
+      const route = row.route ? JSON.parse(row.route) as { rawAnswers?: { primary_skill?: { choice?: string } }; primarySkill?: string | null } : null;
+      const result = row.result ? JSON.parse(row.result) as { status?: string } : null;
+      if (result?.status !== 'clarification_required' || (route?.rawAnswers?.primary_skill?.choice ?? route?.primarySkill) !== skillId) break;
+      count++;
+    }
+    return count;
   }
 
   getProduct(productId: string): ProductDocument {
@@ -301,7 +395,10 @@ export class Store {
   listSessions(userId: string) {
     this.getCard(userId);
     return this.db.prepare(`SELECT id AS sessionId, user_id AS userId, product_id AS productId,
-      status, state_version AS stateVersion, created_at AS createdAt FROM sessions WHERE user_id = ? ORDER BY created_at, id`).all(userId);
+      status, state_version AS stateVersion, created_at AS createdAt,
+      (SELECT content FROM messages WHERE session_id = sessions.id AND role = 'user' ORDER BY sequence LIMIT 1) AS firstUserMessage,
+      (SELECT content FROM messages WHERE session_id = sessions.id AND role = 'user' ORDER BY sequence DESC LIMIT 1) AS latestUserMessage
+      FROM sessions WHERE user_id = ? ORDER BY created_at, id`).all(userId);
   }
 
   getSession(userId: string, sessionId: string): SessionRow {
