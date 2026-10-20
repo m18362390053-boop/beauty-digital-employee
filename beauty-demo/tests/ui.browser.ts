@@ -226,7 +226,7 @@ test('browser: separate customer/operator contexts share a real handoff without 
     assert.equal(await customer.locator('#home-view').isVisible(), true);
     assert.equal(await customer.locator('#consult-view').isVisible(), false);
     await customer.locator('#start-consultation').click();
-    assert.equal(await customer.locator('#consult-view').isVisible(), true);
+    await customer.locator('#consult-view').waitFor({ state: 'visible' });
     assert.equal(await customer.locator('#typesafe-key').count(), 0); assert.equal(await customer.locator('#user-select').count(), 0);
     assert.equal(await customer.locator('#route-result').count(), 0);
     await customer.locator('#profile summary').click(); await customer.locator('#preferences').fill('喜欢清爽');
